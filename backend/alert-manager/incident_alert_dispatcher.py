@@ -10,8 +10,8 @@ from pydantic import BaseModel
 import aiohttp
 
 PORT = int(os.environ.get("PORT", 8003))
-API_GATEWAY_URL = os.environ.get("API_GATEWAY_URL", "http://localhost:3001")
-RESPONSE_ENGINE_URL = os.environ.get("RESPONSE_ENGINE_URL", "http://localhost:8004")
+API_GATEWAY_URL = os.environ.get("API_GATEWAY_URL", "http://127.0.0.1:3001")
+RESPONSE_ENGINE_URL = os.environ.get("RESPONSE_ENGINE_URL", "http://127.0.0.1:8004")
 
 class AnomalySignal(BaseModel):
     anomaly_id: str

@@ -14,8 +14,8 @@ from threat_ip_ledger import ip_manager, BlockReason, ThreatSeverity
 from perimeter_defense_middleware import setup_ip_middleware, process_event_queue, set_socket_io, queue_dropped_event
 
 PORT = int(os.environ.get("PORT", 3001))
-INGEST_SERVICE_URL = os.environ.get("INGEST_SERVICE_URL", "http://localhost:8001")
-RESPONSE_ENGINE_URL = os.environ.get("RESPONSE_ENGINE_URL", "http://localhost:8004")
+INGEST_SERVICE_URL = os.environ.get("INGEST_SERVICE_URL", "http://127.0.0.1:8001")
+RESPONSE_ENGINE_URL = os.environ.get("RESPONSE_ENGINE_URL", "http://127.0.0.1:8004")
 
 class TelemetryEvent(BaseModel):
     event_id: str

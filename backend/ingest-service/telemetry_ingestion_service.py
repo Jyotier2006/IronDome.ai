@@ -1,6 +1,7 @@
 import os
 import uuid
 import time
+import asyncio
 from datetime import datetime
 from contextlib import asynccontextmanager
 
@@ -12,8 +13,8 @@ import aiohttp
 from event_schema_definitions import TelemetryEventInput, TelemetryEvent, IngestResponse, HealthResponse
 from event_persistence_store import init_storage, store_event, get_events, get_event_count, clear_events
 
-DETECTION_ENGINE_URL = os.environ.get("DETECTION_ENGINE_URL", "http://localhost:8002")
-API_GATEWAY_URL = os.environ.get("API_GATEWAY_URL", "http://localhost:3001")
+DETECTION_ENGINE_URL = os.environ.get("DETECTION_ENGINE_URL", "http://127.0.0.1:8002")
+API_GATEWAY_URL = os.environ.get("API_GATEWAY_URL", "http://127.0.0.1:3001")
 
 sio = socketio.AsyncServer(
     async_mode='asgi',
@@ -140,6 +141,23 @@ async def deregister_node(node_id: str):
     del NODE_REGISTRY[node_id]
     return {"success": True, "message": f"Node {node_id} deregistered"}
 
+async def _run_detection_analysis(event_dict: dict):
+    """Runs anomaly detection in the background so it never delays the live telemetry broadcast."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{DETECTION_ENGINE_URL}/analyze",
+                json=event_dict,
+                timeout=aiohttp.ClientTimeout(total=5)
+            ) as resp:
+                if resp.status == 200:
+                    analysis = await resp.json()
+                    anomalies = analysis.get("anomalies_detected", 0)
+                    if anomalies > 0:
+                        print(f"Detection Engine found {anomalies} anomalies")
+    except Exception as e:
+        print(f"Could not reach Detection Engine: {e}")
+
 @app.post("/ingest", response_model=IngestResponse, tags=["Ingest"])
 async def ingest_event(event_input: TelemetryEventInput):
     try:
@@ -175,21 +193,8 @@ async def ingest_event(event_input: TelemetryEventInput):
 
         print(f"Ingested event: {event_id} from {event_input.source_ip}")
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{DETECTION_ENGINE_URL}/analyze",
-                    json=event_dict,
-                    timeout=aiohttp.ClientTimeout(total=5)
-                ) as resp:
-                    if resp.status == 200:
-                        analysis = await resp.json()
-                        anomalies = analysis.get("anomalies_detected", 0)
-                        if anomalies > 0:
-                            print(f"Detection Engine found {anomalies} anomalies")
-        except Exception as e:
-            print(f"Could not reach Detection Engine: {e}")
-
+        # Forward to the dashboard immediately so the live graph isn't gated on
+        # detection/ML latency; anomaly analysis runs in the background instead.
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -201,6 +206,8 @@ async def ingest_event(event_input: TelemetryEventInput):
                         print(f"API Gateway responded: {resp.status}")
         except Exception as e:
             print(f"Could not reach API Gateway: {e}")
+
+        asyncio.create_task(_run_detection_analysis(event_dict))
 
         return IngestResponse(
             success=True,

@@ -20,7 +20,7 @@ from defense_playbook_executor import (
 )
 
 PORT = int(os.environ.get("PORT", 8004))
-API_GATEWAY_URL = os.environ.get("API_GATEWAY_URL", "http://localhost:3001")
+API_GATEWAY_URL = os.environ.get("API_GATEWAY_URL", "http://127.0.0.1:3001")
 
 class Alert(BaseModel):
     id: str

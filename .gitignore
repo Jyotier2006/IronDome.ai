@@ -1,10 +1,12 @@
 # Dependencies
 node_modules/
-backend/**/venv/
-backend/**/__pycache__/
-frontend/node_modules/
+venv/
+__pycache__/
 .pnp
 .pnp.js
+
+# Vite cache
+.vite/
 
 # Testing
 coverage/

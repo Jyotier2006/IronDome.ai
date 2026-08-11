@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Threat_Ops // Agent Console</title>
+    <link rel="stylesheet" href="../static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="overlay"></div>
+    <div class="scan-line"></div>
+
+    <div class="container">
+        <header>
+            <div class="logo">
+                <span class="icon">🛡️</span> THREAT_OPS <span class="blink">_</span>
+            </div>
+            <div class="status-badge" id="conn-status">WAITING FOR SIGNAL...</div>
+        </header>
+
+        <main>
+            <!-- System Diagnostics Panel -->
+            <section class="panel agent-status">
+                <h2>// SYSTEM_DIAGNOSTICS</h2>
+                <div class="grid">
+                    <div class="metric">
+                        <label>DEVICE ID</label>
+                        <span id="device-name">LOADING...</span>
+                    </div>
+                    <div class="metric">
+                        <label>IP ADDRESS</label>
+                        <span id="device-ip">.. . .. . .</span>
+                    </div>
+                </div>
+                <div class="grid">
+                    <div class="metric">
+                        <label>CPU USAGE</label>
+                        <span id="cpu-usage">---%</span>
+                    </div>
+                    <div class="metric">
+                        <label>MEMORY USAGE</label>
+                        <span id="memory-usage">---%</span>
+                    </div>
+                </div>
+                <div class="grid">
+                    <div class="metric">
+                        <label>DISK USAGE</label>
+                        <span id="disk-usage">---%</span>
+                    </div>
+                    <div class="metric">
+                        <label>UPTIME</label>
+                        <span id="uptime">00:00:00</span>
+                    </div>
+                </div>
+                <div class="grid">
+                    <div class="metric">
+                        <label>CPU CORES/THREADS</label>
+                        <span id="cpu-cores">--- / ---</span>
+                    </div>
+                    <div class="metric">
+                        <label>TOTAL MEMORY</label>
+                        <span id="total-memory">--- GB</span>
+                    </div>
+                </div>
+                <div class="grid">
+                    <div class="metric">
+                        <label>ACTIVE PROCESSES</label>
+                        <span id="processes">---</span>
+                    </div>
+                    <div class="metric">
+                        <label>LOAD AVERAGE</label>
+                        <span id="load-avg">---</span>
+                    </div>
+                </div>
+                <div class="grid">
+                    <div class="metric">
+                        <label>NETWORK SENT</label>
+                        <span id="network-sent">--- MB</span>
+                    </div>
+                    <div class="metric">
+                        <label>NETWORK RECEIVED</label>
+                        <span id="network-recv">--- MB</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Server Configuration Panel -->
+            <section class="panel server-config">
+                <h2>// SERVER_CONFIGURATION</h2>
+                <form id="server-config-form">
+                    <div class="input-group">
+                        <label>INGEST END POINT</label>
+                        <input type="text" id="server-ip" placeholder="120.120.121.145:8001" value="120.120.121.145:8001">
+                    </div>
+                    <div class="input-group">
+                        <label>SECTOR</label>
+                        <select id="sector-select" class="select-primary">
+                            <option value="healthcare">🏥 HEALTHCARE</option>
+                            <option value="agriculture">🌾 AGRICULTURE</option>
+                            <option value="urban">🚦 URBAN</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary">UPDATE TARGET</button>
+                </form>
+            </section>
+
+            <!-- Virtual IoT Devices Panel -->
+            <section class="panel iot-devices">
+                <h2>// VIRTUAL_IOT_FLEET</h2>
+                <p class="sector-label" id="current-sector-label">SECTOR: HEALTHCARE</p>
+                <div class="device-grid" id="device-grid">
+                    <!-- Devices populated by JS -->
+                </div>
+                <div class="device-controls">
+                    <button id="heal-all-btn" class="btn-secondary">🔧 HEAL ALL DEVICES</button>
+                    <button id="reset-devices-btn" class="btn-secondary">🔄 RESET FLEET</button>
+                </div>
+            </section>
+
+            <!-- Console Output -->
+            <section class="panel console">
+                <div class="console-header">
+                    <span>TERMINAL_OUTPUT</span>
+                    <button id="clear-console">CLEAR</button>
+                </div>
+                <div class="console-body" id="console-output">
+                    <div class="log-line system">> SYSTEM INITIALIZED...</div>
+                    <div class="log-line system">> LISTENING FOR COMMANDS...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            THREAT_OPS SECURITY SYSTEMS v1.0.4 || UNATHORIZED ACCESS IS PROHIBITED
+        </footer>
+    </div>
+
+    <script src="../static/script.js"></script>
+</body>
+</html>

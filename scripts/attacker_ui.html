@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Threat_Ops: Cyber Attack Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: '#0f172a',
+                        neon: '#00ff41',
+                        danger: '#ff0033'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: 'Courier New', monospace; }
+        .btn { transition: all 0.2s; }
+        .btn:active { transform: scale(0.95); }
+        .log-line { border-bottom: 1px solid #334155; padding: 4px 0; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-8">
+    <div class="w-full max-w-2xl bg-slate-900 rounded-xl border border-slate-700 shadow-2xl overflow-hidden">
+        <div class="bg-slate-800 p-6 border-b border-slate-700 flex justify-between items-center">
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                <span class="text-danger">☠️</span> Cyber Attack Console
+            </h1>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-neon animate-pulse"></div>
+                <span class="text-xs text-slate-400">READY</span>
+            </div>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <div class="bg-black/30 p-4 rounded-lg border border-slate-700">
+                <div class="flex items-center justify-between mb-2">
+                    <label class="block text-xs uppercase tracking-wider text-slate-500">Attack Configuration</label>
+                    <button class="text-xs text-neon hover:underline" onclick="toggleAdvanced()">Advanced Settings</button>
+                </div>
+
+                <div id="advancedSettings" class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Request Count</label>
+                        <input type="number" id="reqCount" value="100" min="1" max="10000"
+                               class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm focus:ring-1 focus:ring-neon outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Concurrency (Threads)</label>
+                        <input type="number" id="concurrency" value="10" min="1" max="100"
+                               class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm focus:ring-1 focus:ring-neon outline-none">
+                    </div>
+                </div>
+
+                <div class="flex gap-2">
+                    <div class="relative flex-1">
+                        <input type="text" id="targetIp" value="http://localhost:5050"
+                               list="common-targets"
+                               class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-neon focus:ring-1 focus:ring-neon outline-none font-mono"
+                               placeholder="http://192.168.1.X:5050">
+                        <datalist id="common-targets">
+                            <option value="http://localhost:5050">
+                            <option value="http://127.0.0.1:5050">
+                        </datalist>
+                    </div>
+
+                    <button onclick="saveToHistory()" class="bg-slate-800 border border-slate-600 px-3 rounded text-slate-400 hover:text-white" title="Save to History">
+                        💾
+                    </button>
+
+                    <button onclick="checkConnection()" class="bg-slate-700 hover:bg-slate-600 px-4 rounded text-sm text-white font-bold btn">
+                        PING
+                    </button>
+                </div>
+                <div id="targetHistory" class="flex flex-wrap gap-2 mt-3 mb-4"></div>
+
+                <!-- IoT Fleet Controls -->
+                <div class="bg-slate-800/50 p-3 rounded border border-slate-700">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase">📡 Fleet Mode (Multi-Laptop)</span>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="fleetModeToggle" onchange="toggleFleetMode()" class="accent-neon">
+                            <span class="text-[10px] text-neon">Enable Fleet Routing</span>
+                        </label>
+                    </div>
+
+                    <div id="fleetModePanel" class="hidden space-y-2">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">API Gateway URL</label>
+                            <input type="text" id="gatewayUrl" value="http://localhost:3001"
+                                   class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs outline-none focus:border-neon">
+                        </div>
+                        <div class="flex gap-2">
+                            <select id="fleetNodeSelect" class="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs outline-none focus:border-neon">
+                                <option value="">🔄 Click "Refresh" to load nodes</option>
+                            </select>
+                            <button onclick="fetchFleetNodes()" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-[10px] text-white">Refresh</button>
+                        </div>
+                        <div id="fleetStatus" class="text-[10px] text-slate-500"></div>
+                    </div>
+
+                    <!-- Legacy Direct Mode (shown when Fleet Mode is OFF) -->
+                    <div id="directModePanel" class="grid grid-cols-2 gap-3 mt-2">
+                        <div>
+                            <select id="sectorSelect" onchange="switchSector()" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs outline-none focus:border-neon">
+                                <option value="healthcare">🏥 Healthcare Node</option>
+                                <option value="agriculture">🌾 Agri Node</option>
+                                <option value="urban">🚦 Urban Node</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select id="iotDeviceSelect" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs outline-none focus:border-neon">
+                                <option value="">🎯 General Attack (No ID)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- General Attacks -->
+            <div class="text-xs text-slate-500 uppercase tracking-wide mt-2 mb-1">🎯 General Attacks</div>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="launchAttack('sql')" class="group relative bg-slate-800 hover:bg-red-900/30 border border-slate-700 hover:border-red-500 p-3 rounded-lg flex flex-col items-center gap-1 btn">
+                    <span class="text-xl">💉</span>
+                    <span class="font-bold text-sm text-red-400">SQL Injection</span>
+                    <span class="text-[10px] text-slate-500">Web Brain Detection</span>
+                </button>
+
+                <button onclick="launchAttack('brute')" class="group relative bg-slate-800 hover:bg-orange-900/30 border border-slate-700 hover:border-orange-500 p-3 rounded-lg flex flex-col items-center gap-1 btn">
+                    <span class="text-xl">🔨</span>
+                    <span class="font-bold text-sm text-orange-400">Brute Force</span>
+                    <span class="text-[10px] text-slate-500">Auth spam</span>
+                </button>
+
+                <button onclick="launchAttack('ddos')" class="group relative bg-slate-800 hover:bg-yellow-900/30 border border-slate-700 hover:border-yellow-500 p-3 rounded-lg flex flex-col items-center gap-1 btn">
+                    <span class="text-xl">🌊</span>
+                    <span class="font-bold text-sm text-yellow-400">Network Flood</span>
+                    <span class="text-[10px] text-slate-500">Network Shield Detection</span>
+                </button>
+
+                <button onclick="launchAttack('scan')" class="group relative bg-slate-800 hover:bg-blue-900/30 border border-slate-700 hover:border-blue-500 p-3 rounded-lg flex flex-col items-center gap-1 btn">
+                    <span class="text-xl">📡</span>
+                    <span class="font-bold text-sm text-blue-400">Port Scan</span>
+                    <span class="text-[10px] text-slate-500">Reconnaissance</span>
+                </button>
+            </div>
+
+            <!-- Sector-Specific ML Attacks -->
+            <div class="text-xs text-slate-500 uppercase tracking-wide mt-4 mb-1">🧠 Sector ML Attacks</div>
+            <div class="grid grid-cols-3 gap-3">
+                <button onclick="launchAttack('healthcare')" class="group relative bg-slate-800 hover:bg-pink-900/30 border border-slate-700 hover:border-pink-500 p-3 rounded-lg flex flex-col items-center gap-1 btn">
+                    <span class="text-xl">🏥</span>
+                    <span class="font-bold text-sm text-pink-400">IoMT DDoS</span>
+                    <span class="text-[10px] text-slate-500">Health Brain</span>
+                </button>
+
+                <button onclick="launchAttack('agriculture')" class="group relative bg-slate-800 hover:bg-green-900/30 border border-slate-700 hover:border-green-500 p-3 rounded-lg flex flex-col items-center gap-1 btn">
+                    <span class="text-xl">🌾</span>
+                    <span class="font-bold text-sm text-green-400">Sensor Spoof</span>
+                    <span class="text-[10px] text-slate-500">Agri Brain</span>
+                </button>
+
+                <button onclick="launchAttack('urban')" class="group relative bg-slate-800 hover:bg-cyan-900/30 border border-slate-700 hover:border-cyan-500 p-3 rounded-lg flex flex-col items-center gap-1 btn">
+                    <span class="text-xl">🚦</span>
+                    <span class="font-bold text-sm text-cyan-400">Traffic Jam</span>
+                    <span class="text-[10px] text-slate-500">Urban Brain</span>
+                </button>
+            </div>
+
+            <button id="stopBtn" onclick="stopAttack()" class="w-full bg-red-900/50 hover:bg-red-800 border border-red-700 text-red-100 py-3 rounded-lg font-bold hidden animate-pulse mt-3">
+                🛑 STOP ACTIVE ATTACK
+            </button>
+        </div>
+
+        <div class="bg-black p-4 h-64 overflow-y-auto font-mono text-sm border-t border-slate-700 relative" id="terminal">
+            <div class="text-slate-500">root@attacker:~$ initialized... waiting for target...</div>
+        </div>
+    </div>
+
+    <script>
+        const terminal = document.getElementById('terminal');
+        let isAttacking = false;
+        let shouldStop = false;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            renderHistory();
+            fetchDevices(); // Load initial devices
+        });
+
+        async function switchSector() {
+            const sector = document.getElementById('sectorSelect').value;
+            const target = document.getElementById('targetIp').value;
+
+            log(`Switching Node to Sector: ${sector}...`, 'warn');
+            try {
+                // Get IP without protocol/port for config if needed, but our monitor server
+                // config endpoint handles it.
+                // Actually server_ip param is determining the INGEST server.
+                // We just want to switch SECTOR.
+                const res = await fetch(`${target}/config`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ sector: sector })
+                });
+                const data = await res.json();
+                log(`Node Switched: ${data.sector.toUpperCase()}`, 'success');
+                fetchDevices(); // Refresh list
+            } catch (err) {
+                log(`Failed to switch sector: ${err.message}`, 'error');
+            }
+        }
+
+        async function fetchDevices() {
+             const target = document.getElementById('targetIp').value;
+             const select = document.getElementById('iotDeviceSelect');
+             select.innerHTML = '<option value="">⏳ Loading...</option>';
+
+             try {
+                const res = await fetch(`${target}/devices`);
+                const data = await res.json();
+
+                select.innerHTML = '<option value="">🎯 General Attack (No ID)</option>';
+
+                // Sync sector dropdown if changed externally
+                document.getElementById('sectorSelect').value = data.sector;
+
+                Object.entries(data.devices).forEach(([id, info]) => {
+                    const statusIcon = info.health < 30 ? '🔴' : info.health < 70 ? '⚠️' : '🟢';
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    opt.text = `${statusIcon} ${id} (${info.type})`;
+                    select.appendChild(opt);
+                });
+                log(`Loaded ${Object.keys(data.devices).length} devices from ${target}`, 'success');
+
+             } catch (err) {
+                 select.innerHTML = '<option value="">❌ Connection Error</option>';
+                 log(`Could not fetch devices: ${err.message}`, 'error');
+             }
+        }
+
+        function toggleAdvanced() {
+            const el = document.getElementById('advancedSettings');
+            el.classList.toggle('hidden');
+        }
+
+        function saveToHistory() {
+            const ip = document.getElementById('targetIp').value;
+            if (!ip) return;
+
+            let history = JSON.parse(localStorage.getItem('attacker_history') || '[]');
+            if (!history.includes(ip)) {
+                history.push(ip);
+                localStorage.setItem('attacker_history', JSON.stringify(history));
+                renderHistory();
+                log(`Saved ${ip} to history`, 'success');
+            }
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('targetHistory');
+            const history = JSON.parse(localStorage.getItem('attacker_history') || '[]');
+
+            container.innerHTML = history.map(ip => `
+                <span onclick="document.getElementById('targetIp').value = '${ip}'"
+                      class="cursor-pointer px-2 py-1 rounded bg-slate-800 border border-slate-600 text-xs text-slate-300 hover:border-neon hover:text-neon transition-colors">
+                    ${ip}
+                </span>
+            `).join('');
+        }
+
+        function log(msg, type = 'info') {
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            const timestamp = new Date().toLocaleTimeString();
+
+            let color = 'text-slate-300';
+            if (type === 'error') color = 'text-red-500';
+            if (type === 'success') color = 'text-neon';
+            if (type === 'warn') color = 'text-yellow-500';
+
+            line.innerHTML = `<span class="text-slate-600">[${timestamp}]</span> <span class="${color}">${msg}</span>`;
+            terminal.appendChild(line);
+
+            // Auto scroll only if close to bottom
+            if(terminal.scrollHeight - terminal.scrollTop < 500) {
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+
+            // Limit log size
+            if(terminal.childElementCount > 500) {
+                terminal.removeChild(terminal.firstChild);
+            }
+        }
+
+        // ==========================================
+        // FLEET MODE FUNCTIONS
+        // ==========================================
+        function toggleFleetMode() {
+            const enabled = document.getElementById('fleetModeToggle').checked;
+            document.getElementById('fleetModePanel').classList.toggle('hidden', !enabled);
+            document.getElementById('directModePanel').classList.toggle('hidden', enabled);
+            log(`Fleet Mode: ${enabled ? 'ENABLED' : 'DISABLED'}`, enabled ? 'success' : 'warn');
+            if (enabled) {
+                fetchFleetNodes();
+            }
+        }
+
+        async function fetchFleetNodes() {
+            const gatewayUrl = document.getElementById('gatewayUrl').value;
+            const select = document.getElementById('fleetNodeSelect');
+            const status = document.getElementById('fleetStatus');
+
+            select.innerHTML = '<option value="">⏳ Loading...</option>';
+            status.textContent = 'Connecting to API Gateway...';
+
+            try {
+                const res = await fetch(`${gatewayUrl}/nodes`, { signal: AbortSignal.timeout(5000) });
+                const data = await res.json();
+
+                if (!data.nodes || data.nodes.length === 0) {
+                    select.innerHTML = '<option value="">⚠️ No nodes registered</option>';
+                    status.textContent = '0 nodes online. Start monitor_server.py on laptops!';
+                    log('No fleet nodes found. Start monitor_server.py on laptops.', 'warn');
+                    return;
+                }
+
+                select.innerHTML = '';
+                data.nodes.forEach(node => {
+                    const statusIcon = node.status === 'online' ? '🟢' : '🔴';
+                    const sectorIcon = node.sector === 'healthcare' ? '🏥' :
+                                       node.sector === 'agriculture' ? '🌾' : '🚦';
+                    const opt = document.createElement('option');
+                    opt.value = node.sector; // Use sector for routing
+                    opt.dataset.nodeId = node.node_id;
+                    opt.dataset.ip = node.ip;
+                    opt.text = `${statusIcon} ${sectorIcon} ${node.node_id} (${node.ip})`;
+                    select.appendChild(opt);
+                });
+
+                const online = data.nodes.filter(n => n.status === 'online').length;
+                status.textContent = `${online}/${data.nodes.length} nodes online`;
+                log(`Fleet nodes loaded: ${online} online`, 'success');
+
+            } catch (err) {
+                select.innerHTML = '<option value="">❌ Connection Error</option>';
+                status.textContent = 'Cannot reach API Gateway';
+                log(`Fleet error: ${err.message}`, 'error');
+            }
+        }
+
+        async function checkConnection() {
+            const target = document.getElementById('targetIp').value;
+            log(`Pinging target: ${target}...`, 'info');
+            try {
+                const res = await fetch(`${target}/`, { signal: AbortSignal.timeout(2000) });
+                const data = await res.json();
+                log(`Target Locked: ${data.device} (${data.status})`, 'success');
+            } catch (err) {
+                log(`Connection failed: ${err.message}`, 'error');
+            }
+        }
+
+        function stopAttack() {
+            if(isAttacking) {
+                shouldStop = true;
+                log('Stopping attack...', 'warn');
+            }
+        }
+
+        function getAttackPayload(type) {
+            // Generate attack payload based on type
+            const payloads = {
+                sql: { query: "SELECT * FROM users WHERE 1=1 OR password LIKE '%'" },
+                brute: { username: `admin_${Math.floor(Math.random() * 1000)}`, password: "password123" },
+                ddos: { rate: 10000 },
+                healthcare: { sensor_data: [1024, 5000, 100, 100] },
+                agriculture: { sensor_data: [100, 0, 0, 255, 255, 255] },
+                urban: { sensor_data: [500, 5] }
+            };
+            return payloads[type] || {};
+        }
+
+        async function launchAttack(type) {
+            if (isAttacking) {
+                log('Attack already in progress. Stop first.', 'error');
+                return;
+            }
+
+            const fleetMode = document.getElementById('fleetModeToggle').checked;
+
+            // FLEET MODE: Route through API Gateway
+            if (fleetMode) {
+                const gatewayUrl = document.getElementById('gatewayUrl').value;
+                const select = document.getElementById('fleetNodeSelect');
+                const targetSector = select.value;
+
+                if (!targetSector) {
+                    log('Select a target node first!', 'error');
+                    return;
+                }
+
+                log(`🎯 FLEET ATTACK: ${type.toUpperCase()} → ${targetSector.toUpperCase()} nodes via Gateway`, 'warn');
+
+                try {
+                    const res = await fetch(`${gatewayUrl}/attack`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sector: targetSector,
+                            attack_type: type,
+                            payload: getAttackPayload(type)
+                        })
+                    });
+
+                    const result = await res.json();
+                    if (result.success) {
+                        log(`✅ Attack routed to ${result.nodes_targeted} node(s)`, 'success');
+                        result.results.forEach(r => {
+                            log(`  └─ ${r.node_id}: ${r.status}`, r.status === 'delivered' ? 'success' : 'error');
+                        });
+                    } else {
+                        log(`❌ Routing failed: ${result.error}`, 'error');
+                    }
+                } catch (err) {
+                    log(`Gateway error: ${err.message}`, 'error');
+                }
+                return;
+            }
+
+            // DIRECT MODE: Original behavior
+            const target = document.getElementById('targetIp').value;
+            const deviceId = document.getElementById('iotDeviceSelect').value; // Get target ID
+            const reqCount = parseInt(document.getElementById('reqCount').value) || 100;
+            const concurrency = parseInt(document.getElementById('concurrency').value) || 10;
+
+
+            isAttacking = true;
+            shouldStop = false;
+            document.getElementById('stopBtn').classList.remove('hidden');
+
+            log(`Starting ${type.toUpperCase()} attack on ${target}`, 'warn');
+            log(`Configuration: ${reqCount} requests, ${concurrency} threads`, 'info');
+
+            let successCount = 0;
+            let failCount = 0;
+            let completed = 0;
+
+            const worker = async (id) => {
+                while(completed < reqCount && !shouldStop) {
+                    completed++; // Claim a task
+                    const currentId = completed;
+
+                    try {
+                        let res;
+                        if (type === 'sql') {
+                            // Web Brain: Diverse SQLi payloads
+                            const payloads = [
+                                `SELECT * FROM users WHERE id=${1000+currentId} OR 1=1 --`,
+                                `admin' --`,
+                                `UNION SELECT 1, 'admin', password FROM users --`,
+                                `1'; DROP TABLE users --`,
+                                `' OR '1'='1`
+                            ];
+                            const payload = payloads[currentId % payloads.length];
+
+                            res = await fetch(`${target}/data`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({ query: payload })
+                            });
+                        } else if (type === 'brute') {
+                            res = await fetch(`${target}/login`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({ username: `admin_${currentId}`, password: `pass${Math.random()}` })
+                            });
+                        } else if (type === 'ddos') {
+                            // Network Shield: High-rate requests
+                            res = await fetch(`${target}/?t=${Date.now()}_${currentId}`);
+                        } else if (type === 'scan') {
+                            await new Promise(r => setTimeout(r, 50));
+                            res = { ok: Math.random() > 0.8 };
+                        } else if (type === 'healthcare') {
+                            // Health Brain: IoMT DDoS - high payload_size, frequency
+                            res = await fetch(`${target}/iomt`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({
+                                    domain: 'healthcare',
+                                    device_id: deviceId,
+                                    sensor_data: [
+                                        Math.random() * 5000 + 1000,
+                                        Math.floor(Math.random() * 500) + 100,
+                                        Math.random() * 100 + 50,
+                                        Math.random() * 80 + 40
+                                    ]
+                                })
+                            });
+                        } else if (type === 'agriculture') {
+                            // Agri Brain: Physics violation
+                            res = await fetch(`${target}/sensors`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({
+                                    domain: 'agriculture',
+                                    device_id: deviceId,
+                                    sensor_data: [
+                                        Math.floor(Math.random() * 50) + 50,
+                                        Math.floor(Math.random() * 10),
+                                        Math.floor(Math.random() * 20),
+                                        Math.floor(Math.random() * 255),
+                                        Math.floor(Math.random() * 255),
+                                        Math.floor(Math.random() * 255)
+                                    ]
+                                })
+                            });
+                        } else if (type === 'urban') {
+                            // Urban Brain: Traffic anomaly
+                            res = await fetch(`${target}/traffic`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({
+                                    domain: 'urban',
+                                    device_id: deviceId,
+                                    sensor_data: [0, 0]
+                                })
+                            });
+                        }
+
+                        if(res && res.ok) successCount++;
+                        else failCount++;
+
+                    } catch (e) {
+                         failCount++;
+                    }
+
+                    // Progress update (throttled)
+                    if(currentId % 20 === 0) {
+                        log(`Progress: ${currentId}/${reqCount} sent...`, 'info');
+                    }
+                }
+            };
+
+            // Start concurrent workers
+            const workers = [];
+            for(let i=0; i < concurrency; i++) {
+                workers.push(worker(i));
+            }
+
+            await Promise.all(workers);
+
+            isAttacking = false;
+            document.getElementById('stopBtn').classList.add('hidden');
+
+            if(shouldStop) {
+                log(`Attack stopped by user. Sent: ${completed}`, 'warn');
+            } else {
+                log(`${type.toUpperCase()} attack complete.`, 'success');
+                log(`Results: ${successCount} success, ${failCount} failed/blocked`, 'info');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -16,15 +16,16 @@ from datetime import datetime, timezone
 # REPLACE THIS with your Mac's IP if running on a different device!
 # Using a list to make it mutable for updates
 config = {
-    "MAIN_SERVER_URL": os.environ.get("MAIN_SERVER_URL", "http://localhost:8001/ingest")
+    "MAIN_SERVER_URL": os.environ.get("MAIN_SERVER_URL", "http://127.0.0.1:8001/ingest")
 }
 
 def get_server_url():
     return config["MAIN_SERVER_URL"]
 
 # This Device's Identity
-DEVICE_ID = socket.gethostname()
+DEVICE_ID = os.environ.get("DEVICE_ID", socket.gethostname())
 DEVICE_NAME = f"{DEVICE_ID}-node"
+PORT = int(os.environ.get("PORT", 5050))
 
 # Get actual network IP (not localhost)
 def get_network_ip():
@@ -69,7 +70,7 @@ BLOCK_DURATION = 60  # seconds
 block_expiry = {}  # {ip: expiry_timestamp}
 
 # Response Engine URL for syncing blocked IPs
-RESPONSE_ENGINE_URL = os.environ.get("RESPONSE_ENGINE_URL", "http://localhost:8004")
+RESPONSE_ENGINE_URL = os.environ.get("RESPONSE_ENGINE_URL", "http://127.0.0.1:8004")
 _cached_blocked_ips = set()
 _last_blocked_sync = 0
 
@@ -133,7 +134,7 @@ SECTOR_BLOCK_RATE = 0.80  # 80% of sector attacks blocked
 # ==========================================
 # IOT FLEET MANAGEMENT (Virtual Devices)
 # ==========================================
-SECTOR = "healthcare"  # Default sector (can be changed via config)
+SECTOR = os.environ.get("SECTOR", "healthcare")  # Default sector (can be changed via config)
 DEVICE_REGISTRY = {}
 TARGET_DEVICE = None  # Currently selected target device
 
@@ -721,7 +722,7 @@ def telemetry_loop():
             if consecutive_failures == 1:
                 print(f"❌ Telemetry error: {type(e).__name__} - {str(e)}")
 
-        time.sleep(2)
+        time.sleep(0.5)
 
 # ==========================================
 # FLEET REGISTRATION (Multi-Laptop Support)
@@ -741,7 +742,7 @@ def register_with_backend():
         response = requests.post(register_url, json={
             "node_id": DEVICE_ID,
             "ip": DEVICE_IP,
-            "port": 5050,
+            "port": PORT,
             "sector": SECTOR
         }, timeout=5)
 
@@ -871,5 +872,5 @@ if __name__ == '__main__':
     t.start()
 
     # Start Attack Listener Web Server
-    app.run(host='0.0.0.0', port=5050)
+    app.run(host='0.0.0.0', port=PORT)
 

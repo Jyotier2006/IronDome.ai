@@ -1,7 +1,7 @@
 import { memo, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const RESPONSE_ENGINE_URL = 'http://localhost:8004'
+const RESPONSE_ENGINE_URL = 'http://127.0.0.1:8004'
 
 const severityConfig = {
   critical: {

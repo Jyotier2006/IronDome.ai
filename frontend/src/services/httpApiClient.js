@@ -7,7 +7,7 @@
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 // Base API URL for production
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001/api'
 
 // ============================================
 // Mock Data Imports

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getSocket } from '../services/realtimeTransportClient'
 
-const API_GATEWAY_URL = 'http://localhost:3001'
+const API_GATEWAY_URL = 'http://127.0.0.1:3001'
 
 /**
  * Hook for managing dropped packets state and real-time updates.

@@ -67,9 +67,10 @@ def store_event(event: dict) -> bool:
             if len(events) > 1000:
                 events = events[-1000:]
 
-            # Write back
+            # Write back (no indent - this file is rewritten on every event, and
+            # pretty-printing a growing list here was adding real latency)
             with open(EVENTS_FILE, 'w') as f:
-                json.dump(events, f, indent=2, default=str)
+                json.dump(events, f, default=str)
 
             _event_count = len(events)
             return True

@@ -4,7 +4,7 @@ import AlertCard from '@components/alerts/IncidentSummaryCard'
 import AlertDetailModal from '@components/alerts/IncidentForensicsModal'
 import CountUp from '@components/common/AnimatedMetricCounter'
 
-const RESPONSE_ENGINE_URL = 'http://localhost:8004'
+const RESPONSE_ENGINE_URL = 'http://127.0.0.1:8004'
 
 function AlertsPanel({ alertsData }) {
   const {

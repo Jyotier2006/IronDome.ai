@@ -176,7 +176,9 @@ async def ingest_event(event_input: TelemetryEventInput):
         )
 
         event_dict = normalized_event.model_dump()
-        stored = store_event(event_dict)
+        # Offload to a thread - this does blocking file I/O and was stalling the
+        # entire event loop (and every other request) on every single telemetry ping.
+        stored = await asyncio.to_thread(store_event, event_dict)
 
         if not stored:
             raise HTTPException(status_code=500, detail="Failed to store event")
@@ -257,7 +259,7 @@ async def ingest_batch(events: list[TelemetryEventInput]):
             )
 
             event_dict = normalized_event.model_dump()
-            if store_event(event_dict):
+            if await asyncio.to_thread(store_event, event_dict):
                 await sio.emit('telemetry', event_dict)
                 ingested.append(event_id)
             else:

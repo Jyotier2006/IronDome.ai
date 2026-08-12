@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 
-const API_GATEWAY_URL = 'http://localhost:3001'
+const API_GATEWAY_URL = 'http://127.0.0.1:3001'
 
 const IoTMapPanel = ({ latestPoint }) => {
   const [fleetNodes, setFleetNodes] = useState([])

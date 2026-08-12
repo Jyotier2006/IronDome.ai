@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const BOOT_LINES = [
@@ -20,6 +20,14 @@ export default function BootSequence({ onDone }) {
   const [phase, setPhase] = useState('booting') // booting -> ready -> exiting
   const [shouldRender, setShouldRender] = useState(true)
 
+  // The parent re-renders constantly once telemetry is flowing, which hands us a
+  // new onDone reference on every render. Keep it in a ref so the exit timer
+  // below doesn't restart every time that happens.
+  const onDoneRef = useRef(onDone)
+  useEffect(() => {
+    onDoneRef.current = onDone
+  })
+
   // Drive the automatic boot timeline.
   useEffect(() => {
     const timers = BOOT_LINES.map((_, i) =>
@@ -35,10 +43,10 @@ export default function BootSequence({ onDone }) {
     if (phase !== 'exiting') return
     const t = setTimeout(() => {
       setShouldRender(false)
-      onDone?.()
+      onDoneRef.current?.()
     }, EXIT_DURATION)
     return () => clearTimeout(t)
-  }, [phase, onDone])
+  }, [phase])
 
   const skip = () => setPhase((p) => (p === 'exiting' ? p : 'exiting'))
 

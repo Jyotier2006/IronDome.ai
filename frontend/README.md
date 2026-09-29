@@ -1,117 +1,69 @@
-# Threat_Ops.ai Frontend
+# IronDome.ai dashboard
 
-Cyber-Resilient Infrastructure Platform - Security Operations Dashboard
+The SOC dashboard for the IronDome.ai passive sensor (SIH PS 26145). It shows live or
+replayed detections from one-way traffic: incidents with severity, confidence and
+evidence, the six PS threat classes, the flow stream, model metrics and a live view of
+how each PS constraint is met. It is read-only by design: there is no block, isolate
+or rate-limit action anywhere in the UI, because the enclave has no return path.
 
-## Overview
+## Views
 
-Real-time security monitoring and response dashboard built with React, Tailwind CSS, and glassmorphism design principles.
+| Tab | What it shows |
+|---|---|
+| Overview | flow rate and monitored bandwidth, open incidents, p95 alert latency, encrypted share, detections per PS class |
+| Threat matrix | the six PS classes (a)–(f) with their techniques, counts and highest confidence |
+| Flow explorer | a rolling sample of flow records with DNS / TLS (JA3, SNI) / QUIC metadata; never any payload |
+| Timeline | incidents and injected lab scenarios in time order, with time from injection to detection |
+| Models | held-out and stress metrics per detector, plus end-to-end replay results |
+| Pipeline & compliance | ingest → features → inference → alert output, and each PS constraint with live evidence |
 
-## Tech Stack
+Clicking an incident opens its forensics view: Community ID, decision against the
+threshold, the features furthest from the benign baseline, MITRE ATT&CK IDs, the
+recommended out-of-band action and the raw alert record (copy / download). The traffic
+lab drawer (flask icon, or <kbd>Ctrl</kbd>+<kbd>K</kbd>) injects attacks into the simulated
+network.
 
-- **React 18** + Vite
-- **Tailwind CSS** (custom dark-mode theme)
-- **socket.io-client** (real-time events)
-- **Recharts** (data visualization)
-- **Framer Motion** (animations)
-
-## Quick Start
-
-### Prerequisites
-- Node.js 18+
-- npm 9+
-
-### Installation
+## Run
 
 ```bash
-cd /Users/aryan/Developer/Threat_Ops.ai/frontend
 npm install
+npm run dev          # http://localhost:5173, talks to the sensor on <page host>:3001
+npm run dev:mock     # built-in sample data, no sensor needed
+npm run build        # production bundle in dist/
 ```
 
-### Development (Mock Mode)
+| Variable | Default | Meaning |
+|---|---|---|
+| `VITE_SENSOR_URL` | `http://<page host>:3001` | sensor REST + Socket.IO base URL |
+| `VITE_USE_MOCK` | `false` | `true` = run on built-in sample data (set by `npm run dev:mock`) |
+
+The dashboard reads `GET /api/models`, `/api/evaluation`, `/api/schema/alert` and
+`/api/alerts/{id}`, posts lab scenarios to `/api/scenario`, and listens on Socket.IO for
+`hello`, `incidents_snapshot`, `flows_snapshot`, `alert`, `alert_update`, `flow_stats`,
+`flows_batch` and `scenario`.
+
+## Docker
 
 ```bash
-# Run with mock data (no backend required)
-VITE_USE_MOCK=true npm run dev
+docker build -t irondome-dashboard .
+docker build --build-arg VITE_SENSOR_URL=http://irondome.local -t irondome-dashboard .   # behind an ingress
+docker run --rm -p 8080:80 irondome-dashboard
 ```
 
-Open http://localhost:5173
-
-### Development (Live Backend)
-
-```bash
-npm run dev
-```
-
-### Production Build
-
-```bash
-npm run build
-npm run preview
-```
-
-## Project Structure
+## Structure
 
 ```
-frontend/
-├── src/
-│   ├── components/     # Reusable UI components
-│   ├── pages/          # Route-level views
-│   ├── services/
-│   │   ├── httpApiClient.js           # HTTP calls (mock-aware)
-│   │   └── realtimeTransportClient.js # WebSocket logic (mock-aware)
-│   ├── hooks/          # Custom React hooks
-│   ├── mock/
-│   │   └── mockTelemetryDataset.js    # Sample data for demos
-│   ├── utils/          # Helpers
-│   ├── SecurityOperationsOrchestrator.jsx  # Main dashboard layout
-│   ├── ApplicationEntryPoint.jsx           # Entry point
-│   └── GlobalDesignTokens.css              # Design system
-├── tailwind.config.js  # Theme configuration
-├── vite.config.js      # Build configuration
-└── package.json
+src/
+├── SecurityOperationsOrchestrator.jsx   # layout, tabs, command palette
+├── components/
+│   ├── panels/        # Overview, ThreatMatrix, FlowExplorer, Timeline, ModelRegistry, Compliance, TrafficLab, ...
+│   ├── alerts/        # incident card and forensics view
+│   ├── charts/        # throughput chart
+│   └── common/        # shared UI (icons, badges, meters, toasts)
+├── hooks/             # useSensorStream (Socket.IO), useIncidentStore (filters, acknowledgements)
+├── services/          # REST client and Socket.IO transport (mock-aware)
+├── constants/         # PS threat-class model, colours, formatting
+└── mock/              # sample data for demo mode
 ```
 
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VITE_USE_MOCK` | `false` | Enable mock data mode |
-| `VITE_API_URL` | `http://localhost:3001/api` | Backend API URL |
-| `VITE_SOCKET_URL` | `http://localhost:3001` | WebSocket server URL |
-
-## Design System
-
-### Colors
-- **Background**: Deep navy (`#0a0e1a` → `#1e293b`)
-- **Normal**: Muted green (`#22c55e`)
-- **Warning**: Amber (`#f59e0b`)
-- **Critical**: Red (`#ef4444`)
-
-### Components
-- `.glass-panel` - Translucent glassmorphism container
-- `.glass-card` - Smaller glassmorphism card
-- `.status-badge` - Status indicator (normal/warning/critical)
-- `.btn-primary` / `.btn-danger` / `.btn-ghost` - Button styles
-
-## Acceptance Tests
-
-After running `npm run dev`, verify:
-
-- [ ] Dev server starts on http://localhost:5173
-- [ ] Dark navy background is visible
-- [ ] Sidebar with navigation items appears on left
-- [ ] Header shows "Security Operations" title
-- [ ] Clock updates every second
-- [ ] Four metric cards display (Active Devices, Events/min, Active Alerts, Blocked Threats)
-- [ ] Glassmorphism panels have translucent blur effect
-- [ ] No errors in browser console
-- [ ] Page title shows "Threat_Ops.ai"
-
-## Next Modules
-
-After verifying this skeleton, the following modules can be added:
-1. Alert components (AlertCard, AlertPanel, AlertDetail)
-2. Device components (DeviceCard, DeviceList, DeviceMap)
-3. Telemetry charts (LiveChart, HistoricalChart)
-4. Playbook components (PlaybookList, PlaybookRunner)
-5. Response action modals
+Built with React 18, Vite 5, Tailwind CSS, Recharts, Framer Motion and socket.io-client.

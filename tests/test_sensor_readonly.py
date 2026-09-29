@@ -79,6 +79,26 @@ class TestReadOnlySensor(unittest.TestCase):
         self.assertEqual(received, 2, "both the JSON record and the NetFlow v5 record are ingested")
         self.assertIsNone(reply, "the collector must never send anything back to the exporter")
 
+    def test_collector_accepts_ipfix_netflow9_and_sflow(self):
+        import random
+        from irondome import ipfix, pcap, sflow
+        svc = self.svc
+        col = svc.FlowCollector(svc.sensor)
+        now = time.time()
+        rec = T.make_record(now - 2, now - 1, "10.10.1.5", 50000, "93.184.216.34", 443, 6, 6, 900, 5, 4000, "SAP", "SAP")
+        before = dict(svc.sensor.sources["udp"]["formats"])
+        n0 = svc.sensor.sources["udp"]["records"]
+        col.datagram_received(ipfix.encode_ipfix([rec]), ("192.0.2.1", 4739))
+        col.datagram_received(ipfix.encode_netflow_v9([rec], now=now), ("192.0.2.2", 2055))
+        rng, sy = random.Random(2), pcap._Synth(2)
+        frames = [(f, orig) for _, f, orig, _ in pcap._tcp_packets(sy, rec, rng)]
+        col.datagram_received(sflow.encode_sflow(frames, rate=1), ("192.0.2.3", 6343))
+        col.sweep(now + 60)
+        fmts = svc.sensor.sources["udp"]["formats"]
+        for f in ("ipfix", "netflow_v9", "sflow"):
+            self.assertEqual(fmts[f], before[f] + 1, f)
+        self.assertEqual(svc.sensor.sources["udp"]["records"] - n0, 3)
+
 
 if __name__ == "__main__":
     unittest.main()

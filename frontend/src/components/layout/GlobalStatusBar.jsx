@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import CountUp from '@/components/common/AnimatedMetricCounter'
+import { Icon } from '@components/common/ui'
+import { USE_MOCK } from '@services/realtimeTransportClient'
 
 const DomeMark = () => (
-  <svg width="20" height="20" viewBox="0 0 64 64" className="shrink-0">
+  <svg width="20" height="20" viewBox="0 0 64 64" className="shrink-0" aria-hidden="true">
     <path d="M10 50 H54" stroke="white" strokeWidth="4.5" strokeLinecap="round" />
     <path d="M14 50 A18 18 0 0 1 50 50" fill="none" stroke="white" strokeWidth="4.5" strokeLinecap="round" />
     <circle cx="32" cy="21" r="3.4" fill="white" />
@@ -11,126 +13,88 @@ const DomeMark = () => (
   </svg>
 )
 
-const StatPill = ({ label, value, tone = 'text-text-secondary', suffix = '', decimals = 0 }) => (
-  <div className="flex items-center gap-1.5">
-    <span className="text-text-muted">{label}</span>
-    <span className={`font-mono font-medium ${tone}`}>
-      <CountUp value={value} decimals={decimals} />{suffix}
-    </span>
-  </div>
-)
+function Kpi({ label, value, unit, decimals = 0 }) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-text-muted">{label}</span>
+      <span className="font-mono font-medium text-text-primary">
+        {Number.isFinite(value) ? <CountUp value={value} decimals={decimals} /> : '-'}
+      </span>
+      {unit && <span className="text-text-muted">{unit}</span>}
+    </div>
+  )
+}
 
-export default function Topbar({ connectionStatus = 'connected', stats, isPaused = false, onTogglePause, onOpenPalette }) {
-  const [currentTime, setCurrentTime] = useState(new Date())
+const POSTURE = [
+  { icon: 'oneway', label: 'Receive-only', title: 'Ingest arrives through a one-way uplink; the sensor never transmits to the source' },
+  { icon: 'eyeoff', label: 'No decryption', title: 'TLS / QUIC analysed from metadata only' },
+  { icon: 'lock', label: 'No return path', title: 'No block / isolate / rate-limit action exists' },
+]
 
+export default function GlobalStatusBar({ connected, stats, openIncidents, paused, onTogglePause, onOpenPalette }) {
+  const [now, setNow] = useState(new Date())
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-    return () => clearInterval(timer)
+    const t = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(t)
   }, [])
 
-  const formatTime = (date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
-  }
-
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
-  }
-
-  const statusConfig = {
-    connected: { color: 'bg-status-normal', text: 'Connected', glow: 'shadow-glow-green' },
-    degraded: { color: 'bg-status-warning', text: 'Degraded', glow: 'shadow-glow-amber' },
-    disconnected: { color: 'bg-status-critical', text: 'Disconnected', glow: 'shadow-glow-red' },
-  }
-
-  const status = statusConfig[connectionStatus] || statusConfig.connected
-  const eventsDisplay = stats?.eventsRate > 999 ? Math.round(stats.eventsRate / 100) / 10 : Math.round(stats?.eventsRate || 0)
-  const eventsSuffix = stats?.eventsRate > 999 ? 'k/min' : '/min'
+  const p95 = stats?.latency?.p95_ms
 
   return (
-    <header className="h-14 px-4 flex items-center justify-between border-b border-white/[0.06] bg-background-secondary/70 backdrop-blur-lg relative z-10">
-      <div className="flex items-center gap-3">
-        <motion.div
-          className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center shadow-glow-cyan"
-          whileHover={{ scale: 1.06, rotate: -3 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-        >
+    <header className="h-14 px-4 flex items-center justify-between gap-4 border-b border-white/[0.06] bg-background-secondary/75 backdrop-blur-lg relative z-10">
+      <div className="flex items-center gap-3 min-w-0">
+        <motion.div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center shadow-glow-cyan shrink-0"
+                    whileHover={{ scale: 1.06, rotate: -3 }} transition={{ type: 'spring', stiffness: 300, damping: 15 }}>
           <DomeMark />
         </motion.div>
-        <div>
-          <h1 className="font-display text-body font-semibold text-text-primary tracking-wide leading-none flex items-baseline gap-1.5">
+        <div className="min-w-0">
+          <h1 className="font-display text-body font-semibold text-text-primary tracking-wide leading-none">
             IronDome<span className="text-accent-cyan">.ai</span>
           </h1>
-          <p className="text-caption text-text-muted -mt-0.5">Security Operations Center</p>
+          <p className="text-[11px] text-text-muted truncate">Passive threat intelligence · unidirectional IP traffic</p>
         </div>
+        <span className="hidden xl:inline-flex items-center gap-1.5 ml-1 px-2 py-1 rounded-md bg-white/[0.04] border border-white/10 text-[11px] text-text-secondary whitespace-nowrap"
+              title="Smart India Hackathon - problem statement 26145 (National Technical Research Organisation)">
+          SIH · PS 26145 · NTRO
+        </span>
       </div>
 
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-glass border border-white/[0.07]">
-          <motion.span
-            className={`w-2 h-2 rounded-full ${status.color} ${status.glow}`}
-            animate={{ opacity: [1, 0.5, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-          <span className="text-caption text-text-secondary">{status.text}</span>
-        </div>
-
-        <div className="hidden md:flex items-center gap-4 text-caption">
-          <StatPill label="Events:" value={eventsDisplay} suffix={eventsSuffix} tone="text-status-normal" decimals={stats?.eventsRate > 999 ? 1 : 0} />
-          <StatPill
-            label="Alerts:"
-            value={stats?.activeAlerts || 0}
-            tone={stats?.activeAlerts > 0 ? 'text-status-warning' : 'text-text-secondary'}
-          />
-          <StatPill
-            label="Blocked:"
-            value={stats?.blockedCount || 0}
-            tone={stats?.blockedCount > 0 ? 'text-status-critical' : 'text-text-secondary'}
-          />
-        </div>
+      <div className="hidden lg:flex items-center gap-2">
+        <span className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-[11px] text-text-secondary">
+          <motion.span className={`w-2 h-2 rounded-full ${connected ? 'bg-status-normal' : 'bg-status-critical'}`}
+                       animate={{ opacity: [1, 0.45, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+          {USE_MOCK ? 'Demo data' : connected ? 'Sensor live' : 'Sensor offline'}
+        </span>
+        {POSTURE.map((p) => (
+          <span key={p.label} title={p.title}
+                className="hidden 2xl:inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-[11px] text-text-secondary">
+            <Icon name={p.icon} className="w-3.5 h-3.5" /> {p.label}
+          </span>
+        ))}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="hidden md:flex items-center gap-4 text-[12px]">
+        <Kpi label="Flows/s" value={stats?.flows_per_s} />
+        <Kpi label="Mbps" value={stats?.mbps} decimals={1} />
+        <Kpi label="p95" value={p95 != null ? p95 / 1000 : NaN} unit="s" decimals={1} />
+        <Kpi label="Open" value={openIncidents} />
+      </div>
+
+      <div className="flex items-center gap-3">
         <div className="text-right hidden sm:block">
-          <p className="text-body font-mono text-text-primary tabular-nums">{formatTime(currentTime)}</p>
-          <p className="text-caption text-text-muted -mt-0.5">{formatDate(currentTime)}</p>
+          <p className="text-body font-mono text-text-primary tabular-nums leading-none">{now.toLocaleTimeString('en-GB', { hour12: false })}</p>
+          <p className="text-[11px] text-text-muted">{now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <motion.button
-            onClick={onOpenPalette}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-glass bg-surface-glass hover:bg-surface-glass-hover border border-white/[0.07] text-text-muted hover:text-text-secondary transition-colors"
-            title="Command palette"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" /></svg>
-            <span className="text-caption">Search</span>
-            <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10">Ctrl K</kbd>
-          </motion.button>
-          <button
-            onClick={onTogglePause}
-            className={`p-2 rounded-glass transition-colors ${
-              isPaused ? 'bg-status-warning/20 text-status-warning' : 'hover:bg-surface-glass-hover text-text-secondary'
-            }`}
-            title={isPaused ? 'Resume Feed' : 'Pause Feed'}
-          >
-            {isPaused ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            )}
-          </button>
-        </div>
+        <button type="button" onClick={onOpenPalette}
+                className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-text-muted hover:text-text-secondary"
+                title="Command palette">
+          <Icon name="search" className="w-3.5 h-3.5" />
+          <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10">Ctrl K</kbd>
+        </button>
+        <button type="button" onClick={onTogglePause} title={paused ? 'Resume flow view' : 'Pause flow view'}
+                className={`p-2 rounded-lg transition-colors ${paused ? 'bg-status-warning/20 text-text-primary' : 'hover:bg-white/[0.06] text-text-secondary'}`}>
+          <Icon name={paused ? 'play' : 'pause'} className="w-5 h-5" />
+        </button>
       </div>
     </header>
   )

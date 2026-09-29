@@ -1,11 +1,11 @@
 {
-  "name": "threat-ops-dashboard",
-  "version": "1.0.0",
+  "name": "irondome-dashboard",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:mock": "VITE_USE_MOCK=true vite",
+    "dev:mock": "vite --mode mock",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext js,jsx"
@@ -13,7 +13,6 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0",
     "socket.io-client": "^4.7.2",
     "recharts": "^2.10.3",
     "framer-motion": "^10.16.16",
@@ -28,5 +27,6 @@
     "eslint": "^8.55.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0"
-  }
+  },
+  "description": "Dashboard for the IronDome.ai passive threat-detection sensor (SIH PS 26145)"
 }

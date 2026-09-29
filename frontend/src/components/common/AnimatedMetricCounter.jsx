@@ -20,7 +20,7 @@ export default function CountUp({ value, duration = 500, decimals = 0, className
     cancelAnimationFrame(rafRef.current)
 
     const tick = (now) => {
-      const t = Math.min(1, (now - start) / duration)
+      const t = Math.min(1, Math.max(0, (now - start) / duration))
       const eased = 1 - Math.pow(1 - t, 3)
       setDisplay(from + (value - from) * eased)
       if (t < 1) {

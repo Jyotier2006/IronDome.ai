@@ -1,327 +1,255 @@
 import { memo, useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ClassDot, ConfidenceMeter, Icon, SeverityBadge } from '@components/common/ui'
+import { downloadJson } from '@services/httpApiClient'
+import { classInfo, entityText, featureLabel } from '@/constants/threatModel'
 
-const RESPONSE_ENGINE_URL = 'http://127.0.0.1:8004'
-
-const severityConfig = {
-  critical: {
-    color: 'text-status-critical',
-    bg: 'bg-status-critical/10',
-    border: 'border-status-critical/30',
-    icon: <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
-    label: 'Critical',
-  },
-  warning: {
-    color: 'text-status-warning',
-    bg: 'bg-status-warning/10',
-    border: 'border-status-warning/30',
-    icon: <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    label: 'Warning',
-  },
-  normal: {
-    color: 'text-status-normal',
-    bg: 'bg-status-normal/10',
-    border: 'border-status-normal/30',
-    icon: <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    label: 'Normal',
-  },
+const mitreUrl = (t) => {
+  const [base, sub] = t.split('.')
+  return `https://attack.mitre.org/techniques/${base}/${sub ? `${sub}/` : ''}`
 }
 
-function AlertDetailModal({
-  alert,
-  isOpen,
-  onClose,
-  onAcknowledge,
-  onDismiss,
-}) {
-  const [isRunningPlaybook, setIsRunningPlaybook] = useState(false)
-  const [playbookResult, setPlaybookResult] = useState(null)
+const fmtTime = (iso) => (iso ? new Date(iso).toLocaleString('en-GB', { hour12: false }) : '-')
 
-  const handleRunPlaybook = async () => {
-    if (!alert || isRunningPlaybook) return
+function Section({ title, children }) {
+  return (
+    <section>
+      <h4 className="text-[11px] uppercase tracking-wider text-text-muted mb-1.5">{title}</h4>
+      {children}
+    </section>
+  )
+}
 
-    setIsRunningPlaybook(true)
-    setPlaybookResult(null)
+function KV({ k, v, mono = false }) {
+  return (
+    <div className="flex justify-between gap-3 py-0.5 text-[12px]">
+      <span className="text-text-muted shrink-0">{k}</span>
+      <span className={`text-text-primary text-right break-all ${mono ? 'font-mono' : ''}`}>{v}</span>
+    </div>
+  )
+}
 
-    try {
-      const res = await fetch(`${RESPONSE_ENGINE_URL}/execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: alert.id,
-          title: alert.title,
-          description: alert.description || '',
-          severity: alert.severity,
-          source: alert.source,
-          timestamp: alert.timestamp,
-          evidence: alert.evidence || {},
-          recommendation: alert.recommendation || '',
-          rule_id: alert.rule_id || 'manual_response',
-        })
-      })
+function ZBar({ z }) {
+  const mag = Math.min(1, Math.abs(z) / 12)
+  return (
+    <span className="relative inline-block w-24 h-2 align-middle" aria-hidden="true">
+      <span className="absolute inset-y-0 left-1/2 w-px bg-white/25" />
+      <span className="absolute inset-y-0 rounded-full" style={{
+        background: '#7d8aa5',
+        width: `${mag * 50}%`,
+        left: z >= 0 ? '50%' : `${50 - mag * 50}%`,
+      }} />
+    </span>
+  )
+}
 
-      if (res.ok) {
-        const data = await res.json()
-        setPlaybookResult({
-          success: true,
-          actionsExecuted: data.actions_executed || 0,
-          actions: data.actions || []
-        })
-
-        // Auto-acknowledge the alert after running playbook
-        if (onAcknowledge) {
-          onAcknowledge(alert.id)
-        }
-      } else {
-        setPlaybookResult({ success: false, error: 'Failed to execute playbook' })
-      }
-    } catch (err) {
-      console.error('Playbook execution error:', err)
-      setPlaybookResult({ success: false, error: err.message })
-    } finally {
-      setIsRunningPlaybook(false)
+function renderValue(v) {
+  if (v == null) return '-'
+  if (Array.isArray(v)) {
+    if (!v.length) return '-'
+    if (typeof v[0] === 'object') {
+      return v.slice(0, 6).map((o) => Object.values(o).join(' · ')).join('\n')
     }
+    return v.slice(0, 12).join(', ')
   }
+  if (typeof v === 'object') {
+    return Object.entries(v).map(([a, b]) => {
+      // window bounds arrive as epoch seconds: show them as clock times
+      if ((a === 'start' || a === 'end') && typeof b === 'number' && b > 1e9) {
+        return `${a}: ${new Date(b * 1000).toLocaleTimeString('en-GB', { hour12: false })}`
+      }
+      if (typeof b === 'number') return `${a}: ${Number(b.toFixed(3))}`
+      if (b && typeof b === 'object') return `${a}: ${JSON.stringify(b)}`
+      return `${a}: ${b}`
+    }).join(' · ')
+  }
+  if (typeof v === 'number') return Number.isInteger(v) ? v.toLocaleString('en-IN') : v.toFixed(3)
+  return String(v)
+}
+
+function IncidentForensicsModal({ incident, isOpen, acked, onClose, onAcknowledge }) {
+  const [showRaw, setShowRaw] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') onClose()
-    }
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape)
-      document.body.style.overflow = 'hidden'
-    }
-    return () => {
-      document.removeEventListener('keydown', handleEscape)
-      document.body.style.overflow = ''
-    }
+    if (!isOpen) return undefined
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
   }, [isOpen, onClose])
 
-  if (!alert) return null
+  useEffect(() => { setShowRaw(false); setCopied(false) }, [incident?.incident_id])
 
-  const config = severityConfig[alert.severity] || severityConfig.normal
+  if (!incident) return null
+  const info = classInfo(incident.threat_class)
+  const ev = incident.evidence || {}
+  const ctx = ev.context || {}
+  const devs = ev.top_deviations || []
+  const det = incident.detector || {}
+  const flow = incident.flow || {}
+  const extra = Object.entries(ev).filter(([k]) => !['features', 'top_deviations', 'context'].includes(k))
 
-  const formatTimestamp = (iso) => {
-    const date = new Date(iso)
-    return date.toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    })
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(incident, null, 2))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch { /* clipboard unavailable */ }
   }
 
   return (
     <AnimatePresence>
       {isOpen && (
         <>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}
+                      className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50" />
+          {/* Centred by a flex wrapper: the motion transform would override translate-based centring */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-          />
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[600px] md:max-h-[80vh] z-50 flex flex-col glass-panel overflow-hidden"
+            initial={{ opacity: 0, scale: 0.97, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97, y: 16 }}
+            className="pointer-events-auto w-full h-full md:h-auto md:w-[760px] md:max-h-[86vh] flex flex-col glass-panel bg-[#0d111c]/95 overflow-hidden"
+            role="dialog" aria-modal="true" aria-label={`Incident: ${incident.technique_label}`}
           >
-            <div className={`p-4 border-b ${config.border} ${config.bg}`}>
+            <header className="p-4 border-b border-white/[0.07]" style={{ boxShadow: `inset 0 3px 0 0 ${info.color}` }}>
               <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <span className={config.color}>{config.icon}</span>
-                  <div>
-                    <h2 className="text-title text-text-primary">{alert.title}</h2>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.color}`}>
-                        {config.label}
-                      </span>
-                      <span className="text-caption text-text-muted">
-                        {alert.source}
-                      </span>
-                      {alert.acknowledged && (
-                        <span className="text-caption text-status-normal flex items-center gap-1">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                          Acknowledged
-                        </span>
-                      )}
-                    </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                    <ClassDot cls={incident.threat_class} size={10} />
+                    <span className="font-mono">PS ({info.ps})</span>
+                    <span>{info.label}</span>
+                  </div>
+                  <h2 className="mt-1 text-xl font-semibold text-text-primary">{incident.technique_label || incident.technique}</h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <SeverityBadge severity={incident.severity} />
+                    <span className="text-[12px] text-text-secondary flex items-center gap-2">Confidence <ConfidenceMeter value={incident.confidence} color={info.color} width="w-24" /></span>
+                    {incident.occurrences > 1 && <span className="text-[12px] text-text-secondary">×{incident.occurrences} correlated sightings</span>}
+                    {acked && <span className="text-[12px] text-text-secondary flex items-center gap-1"><Icon name="check" className="w-3 h-3" />Acknowledged</span>}
                   </div>
                 </div>
-                <button
-                  onClick={onClose}
-                  className="p-2 rounded-glass hover:bg-surface-glass-hover transition-colors text-text-muted"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.06] text-text-muted" aria-label="Close">
+                  <Icon name="x" />
                 </button>
               </div>
-            </div>
+            </header>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <section>
-                <h3 className="text-caption text-text-muted uppercase tracking-wider mb-2">
-                  What Happened
-                </h3>
-                <p className="text-body text-text-primary">
-                  {alert.description}
-                </p>
-              </section>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 thin-scrollbar">
+              <Section title="What was detected">
+                <p className="text-[13px] text-text-primary leading-relaxed">{incident.description}</p>
+              </Section>
 
-              <section>
-                <h3 className="text-caption text-text-muted uppercase tracking-wider mb-2">
-                  When
-                </h3>
-                <p className="text-body text-text-primary font-mono">
-                  {formatTimestamp(alert.timestamp)}
-                </p>
-              </section>
-
-              {alert.evidence && (
-                <section>
-                  <h3 className="text-caption text-text-muted uppercase tracking-wider mb-2">
-                    Evidence
-                  </h3>
-                  <div className="glass-card p-3 space-y-2">
-                    {Object.entries(alert.evidence).map(([key, value]) => (
-                      <div key={key} className="flex justify-between items-center">
-                        <span className="text-caption text-text-muted capitalize">
-                          {key.replace(/([A-Z])/g, ' $1').trim()}
-                        </span>
-                        <span className="text-body text-text-primary font-mono">
-                          {typeof value === 'object' ? JSON.stringify(value) : value}
-                        </span>
-                      </div>
-                    ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Section title="Flow identity">
+                  <div className="glass-card p-3">
+                    <KV k="Flow ID (Community ID v1)" v={incident.flow_id} mono />
+                    <KV k="5-tuple" v={`${flow.src_ip}:${flow.src_port ?? '-'} → ${flow.dst_ip}:${flow.dst_port ?? '-'} ${flow.protocol || ''}`} mono />
+                    <KV k="Entity" v={entityText(incident)} mono />
+                    <KV k="First seen" v={fmtTime(incident.first_seen)} />
+                    <KV k="Last seen" v={fmtTime(incident.last_seen)} />
+                    <KV k="Alert raised" v={fmtTime(incident.timestamp)} />
+                    <KV k="Related flows" v={(incident.related_flow_ids || []).length} />
                   </div>
-                </section>
+                </Section>
+                <Section title="Classification & decision">
+                  <div className="glass-card p-3">
+                    <KV k="Threat class" v={`(${info.ps}) ${info.label}`} />
+                    <KV k="Technique" v={incident.technique} mono />
+                    <KV k="Detector" v={det.model || det.name} />
+                    <KV k="Mode" v={det.mode === 'ml+intel' ? 'ML + threat intel' : det.mode} />
+                    <KV k="Confidence vs threshold" v={`${(incident.confidence * 100).toFixed(1)}% ≥ ${((det.threshold ?? 0) * 100).toFixed(1)}%`} />
+                    {incident.latency_ms != null && <KV k="Processing latency" v={`${(incident.latency_ms / 1000).toFixed(2)} s`} />}
+                    <div className="flex justify-between gap-3 py-0.5 text-[12px]">
+                      <span className="text-text-muted">MITRE ATT&CK</span>
+                      <span className="flex flex-wrap justify-end gap-1">
+                        {(incident.mitre_attack || []).map((t) => (
+                          <a key={t} href={mitreUrl(t)} target="_blank" rel="noreferrer"
+                             className="px-1.5 py-0.5 rounded bg-white/[0.05] border border-white/10 font-mono text-[11px] text-text-primary hover:bg-white/[0.10]">{t}</a>
+                        ))}
+                      </span>
+                    </div>
+                  </div>
+                </Section>
+              </div>
+
+              {devs.length > 0 && (
+                <Section title="Evidence - features furthest from the benign baseline">
+                  <div className="glass-card p-3 overflow-x-auto">
+                    <table className="w-full text-[12px]">
+                      <thead className="text-text-muted text-[11px]">
+                        <tr>
+                          <th className="text-left font-medium pb-1">Feature</th>
+                          <th className="text-right font-medium pb-1">Observed</th>
+                          <th className="text-right font-medium pb-1">Benign mean</th>
+                          <th className="text-right font-medium pb-1 pl-4">Deviation (σ)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {devs.map((d) => (
+                          <tr key={d.feature} className="border-t border-white/[0.05]">
+                            <td className="py-1 text-text-primary">{featureLabel(d.feature)}</td>
+                            <td className="py-1 text-right tabular text-text-primary">{renderValue(d.value)}</td>
+                            <td className="py-1 text-right tabular text-text-secondary">{renderValue(d.benign_mean)}</td>
+                            <td className="py-1 text-right tabular text-text-secondary pl-4 whitespace-nowrap">
+                              <ZBar z={d.z_score} /> <span className="ml-1">{d.z_score > 0 ? '+' : ''}{d.z_score}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Section>
               )}
 
-              {alert.recommendation && (
-                <section>
-                  <h3 className="text-caption text-text-muted uppercase tracking-wider mb-2">
-                    Recommended Action
-                  </h3>
-                  <div className="glass-card p-3 border-l-2 border-accent-cyan">
-                    <p className="text-body text-text-primary">
-                      {alert.recommendation}
-                    </p>
+              {(Object.keys(ctx).length > 0 || extra.length > 0) && (
+                <Section title="Supporting context">
+                  <div className="glass-card p-3">
+                    {Object.entries(ctx).map(([k, v]) => <KV key={k} k={featureLabel(k)} v={<span className="whitespace-pre-line">{renderValue(v)}</span>} mono />)}
+                    {extra.map(([k, v]) => <KV key={k} k={featureLabel(k)} v={<span className="whitespace-pre-line">{renderValue(v)}</span>} mono />)}
                   </div>
-                </section>
+                </Section>
               )}
 
-              {alert.ruleName && (
-                <section>
-                  <h3 className="text-caption text-text-muted uppercase tracking-wider mb-2">
-                    Detection Rule
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-body text-text-primary">{alert.ruleName}</span>
-                    <span className="text-caption text-text-muted font-mono">({alert.ruleId})</span>
-                  </div>
-                </section>
-              )}
+              <Section title="Recommended action (out-of-band)">
+                <div className="glass-card p-3 text-[12px] text-text-primary leading-relaxed flex gap-2">
+                  <Icon name="info" className="w-4 h-4 mt-px text-text-secondary shrink-0" />
+                  <span>{incident.recommended_action} The sensor sits behind a one-way link and cannot act on the network itself.</span>
+                </div>
+              </Section>
 
-              {/* Playbook Execution Result */}
-              {playbookResult && (
-                <section>
-                  <h3 className="text-caption text-text-muted uppercase tracking-wider mb-2">
-                    Playbook Result
-                  </h3>
-                  <div className={`glass-card p-3 border-l-2 ${
-                    playbookResult.success ? 'border-accent-green' : 'border-status-critical'
-                  }`}>
-                    {playbookResult.success ? (
-                      <>
-                        <p className="text-body text-accent-green mb-2 flex items-center gap-2">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          Executed {playbookResult.actionsExecuted} action(s)
-                        </p>
-                        {playbookResult.actions?.length > 0 && (
-                          <div className="space-y-1 text-sm">
-                            {playbookResult.actions.map((action, i) => (
-                              <div key={i} className="flex items-center gap-2">
-                                <span className={action.status === 'success' ? 'text-accent-green' : 'text-status-warning'}>
-                                  {action.status === 'success' ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>}
-                                </span>
-                                <span className="text-text-secondary">{action.message}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-body text-status-critical flex items-center gap-2">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        {playbookResult.error || 'Playbook execution failed'}
-                      </p>
-                    )}
-                  </div>
-                </section>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-white/5 flex items-center justify-between gap-3">
-              <div className="flex gap-2">
-                {!alert.acknowledged && (
-                  <>
-                    <button
-                      onClick={() => onAcknowledge?.(alert.id)}
-                      className="btn-primary flex items-center gap-1"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                      Acknowledge
-                    </button>
-                    <button
-                      onClick={() => {
-                        onDismiss?.(alert.id)
-                        onClose()
-                      }}
-                      className="btn-danger"
-                    >
-                      Dismiss
-                    </button>
-                  </>
+              <Section title="Standard alert record">
+                <div className="flex gap-2 mb-2">
+                  <button type="button" onClick={() => setShowRaw((s) => !s)} className="btn-ghost !px-2.5 !py-1 !text-[12px] border border-white/10">
+                    {showRaw ? 'Hide JSON' : 'Show JSON'}
+                  </button>
+                  <button type="button" onClick={copy} className="btn-ghost !px-2.5 !py-1 !text-[12px] border border-white/10 flex items-center gap-1.5">
+                    <Icon name="copy" className="w-3.5 h-3.5" /> {copied ? 'Copied' : 'Copy'}
+                  </button>
+                  <button type="button" onClick={() => downloadJson(`alert-${incident.incident_id}.json`, incident)}
+                          className="btn-ghost !px-2.5 !py-1 !text-[12px] border border-white/10 flex items-center gap-1.5">
+                    <Icon name="download" className="w-3.5 h-3.5" /> Download
+                  </button>
+                </div>
+                {showRaw && (
+                  <pre className="max-h-72 overflow-auto thin-scrollbar rounded-lg bg-black/40 border border-white/[0.06] p-3 text-[11px] text-text-secondary font-mono">
+                    {JSON.stringify(incident, null, 2)}
+                  </pre>
                 )}
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={handleRunPlaybook}
-                  disabled={isRunningPlaybook}
-                  className={`btn-ghost flex items-center gap-2 ${
-                    isRunningPlaybook ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent-green/20'
-                  }`}
-                >
-                  {isRunningPlaybook ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      Run Playbook
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={onClose}
-                  className="btn-ghost"
-                >
-                  Close
-                </button>
-              </div>
+              </Section>
             </div>
+
+            <footer className="p-3 border-t border-white/[0.07] flex justify-end gap-2">
+              {!acked && (
+                <button type="button" onClick={() => onAcknowledge(incident.incident_id)} className="btn-primary !py-1.5 !text-[13px] flex items-center gap-1.5">
+                  <Icon name="check" className="w-4 h-4" /> Acknowledge
+                </button>
+              )}
+              <button type="button" onClick={onClose} className="btn-ghost !py-1.5 !text-[13px]">Close</button>
+            </footer>
           </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
   )
 }
 
-export default memo(AlertDetailModal)
+export default memo(IncidentForensicsModal)

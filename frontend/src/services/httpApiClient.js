@@ -1,210 +1,50 @@
 // ============================================
-// THREAT_OPS.AI - API Service
-// All HTTP calls isolated in this module
+// IronDome.ai - REST client for the passive sensor
+// Read endpoints for alerts, models, validation and schema, plus the traffic-lab
+// scenario injector (which drives the *simulated source*, not the sensor).
+// There is intentionally no block / isolate / rate-limit call: the enclave is read-only.
 // ============================================
+import { SENSOR_URL, USE_MOCK, mockInject } from './realtimeTransportClient'
+import { mockModels } from '@mock/mockTrafficDataset'
 
-// Mock mode toggle - set via environment variable
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-
-// Base API URL for production
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001/api'
-
-// ============================================
-// Mock Data Imports
-// ============================================
-import {
-  mockAlerts,
-  mockDevices,
-  mockTelemetry,
-  mockSystemStatus,
-  mockPlaybooks
-} from '@mock/mockTelemetryDataset'
-
-// ============================================
-// Response Helper
-// ============================================
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
-
-const mockResponse = async (data, delayMs = 200) => {
-  await delay(delayMs)
-  return { data, success: true }
-}
-
-const apiRequest = async (endpoint, options = {}) => {
-  try {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    })
-
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`)
-    }
-
-    const data = await response.json()
-    return { data, success: true }
-  } catch (error) {
-    console.error(`API request failed: ${endpoint}`, error)
-    return { data: null, success: false, error: error.message }
-  }
-}
-
-// ============================================
-// Alert APIs
-// ============================================
-export const fetchAlerts = async (filters = {}) => {
-  if (USE_MOCK) {
-    let alerts = [...mockAlerts]
-    if (filters.severity) {
-      alerts = alerts.filter(a => a.severity === filters.severity)
-    }
-    return mockResponse(alerts)
-  }
-  return apiRequest('/alerts')
-}
-
-export const acknowledgeAlert = async (alertId) => {
-  if (USE_MOCK) {
-    return mockResponse({ id: alertId, acknowledged: true })
-  }
-  return apiRequest(`/alerts/${alertId}/acknowledge`, { method: 'POST' })
-}
-
-export const dismissAlert = async (alertId) => {
-  if (USE_MOCK) {
-    return mockResponse({ id: alertId, dismissed: true })
-  }
-  return apiRequest(`/alerts/${alertId}/dismiss`, { method: 'POST' })
-}
-
-// ============================================
-// Device APIs
-// ============================================
-export const fetchDevices = async () => {
-  if (USE_MOCK) {
-    return mockResponse(mockDevices)
-  }
-  return apiRequest('/devices')
-}
-
-export const fetchDeviceById = async (deviceId) => {
-  if (USE_MOCK) {
-    const device = mockDevices.find(d => d.id === deviceId)
-    return mockResponse(device)
-  }
-  return apiRequest(`/devices/${deviceId}`)
-}
-
-export const updateDeviceStatus = async (deviceId, status) => {
-  if (USE_MOCK) {
-    return mockResponse({ id: deviceId, status })
-  }
-  return apiRequest(`/devices/${deviceId}/status`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status }),
+async function request(path, options = {}) {
+  const res = await fetch(`${SENSOR_URL}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
   })
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`
+    try {
+      detail = (await res.json()).detail || detail
+    } catch { /* keep status text */ }
+    throw new Error(detail)
+  }
+  return res.json()
 }
 
-// ============================================
-// Telemetry APIs
-// ============================================
-export const fetchTelemetry = async (timeRange = '1h') => {
-  if (USE_MOCK) {
-    return mockResponse(mockTelemetry)
-  }
-  return apiRequest(`/telemetry?range=${timeRange}`)
+export const fetchModels = () => (USE_MOCK ? Promise.resolve(mockModels()) : request('/api/models'))
+
+export const fetchEvaluation = () => (USE_MOCK ? Promise.resolve({}) : request('/api/evaluation'))
+
+export const fetchAlertSchema = () => (USE_MOCK ? Promise.resolve({ title: 'demo' }) : request('/api/schema/alert'))
+
+export const fetchIncident = (id) => request(`/api/alerts/${encodeURIComponent(id)}`)
+
+export function injectScenario(scenario, intensity = 1) {
+  if (USE_MOCK) return Promise.resolve({ started: mockInject(scenario) })
+  return request('/api/scenario', { method: 'POST', body: JSON.stringify({ scenario, intensity }) })
 }
 
-export const fetchTelemetryByDevice = async (deviceId, timeRange = '1h') => {
-  if (USE_MOCK) {
-    const filtered = mockTelemetry.filter(t => t.deviceId === deviceId)
-    return mockResponse(filtered)
-  }
-  return apiRequest(`/telemetry/${deviceId}?range=${timeRange}`)
-}
-
-// ============================================
-// System Status APIs
-// ============================================
-export const fetchSystemStatus = async () => {
-  if (USE_MOCK) {
-    return mockResponse(mockSystemStatus)
-  }
-  return apiRequest('/system/status')
-}
-
-// ============================================
-// Playbook APIs
-// ============================================
-export const fetchPlaybooks = async () => {
-  if (USE_MOCK) {
-    return mockResponse(mockPlaybooks)
-  }
-  return apiRequest('/playbooks')
-}
-
-export const executePlaybook = async (playbookId, params = {}) => {
-  if (USE_MOCK) {
-    return mockResponse({
-      playbookId,
-      executionId: `exec-${Date.now()}`,
-      status: 'running',
-      startedAt: new Date().toISOString()
-    }, 500)
-  }
-  return apiRequest(`/playbooks/${playbookId}/execute`, {
-    method: 'POST',
-    body: JSON.stringify(params),
-  })
-}
-
-// ============================================
-// Response Action APIs
-// ============================================
-export const blockIP = async (ipAddress, reason) => {
-  if (USE_MOCK) {
-    return mockResponse({
-      action: 'block',
-      target: ipAddress,
-      reason,
-      executedAt: new Date().toISOString()
-    }, 300)
-  }
-  return apiRequest('/actions/block-ip', {
-    method: 'POST',
-    body: JSON.stringify({ ipAddress, reason }),
-  })
-}
-
-export const isolateDevice = async (deviceId, reason) => {
-  if (USE_MOCK) {
-    return mockResponse({
-      action: 'isolate',
-      target: deviceId,
-      reason,
-      executedAt: new Date().toISOString()
-    }, 300)
-  }
-  return apiRequest('/actions/isolate-device', {
-    method: 'POST',
-    body: JSON.stringify({ deviceId, reason }),
-  })
-}
-
-export const throttleService = async (serviceId, limit) => {
-  if (USE_MOCK) {
-    return mockResponse({
-      action: 'throttle',
-      target: serviceId,
-      limit,
-      executedAt: new Date().toISOString()
-    }, 300)
-  }
-  return apiRequest('/actions/throttle', {
-    method: 'POST',
-    body: JSON.stringify({ serviceId, limit }),
-  })
+// Downloads are generated client-side from what the dashboard holds.
+export function downloadJson(filename, data, jsonl = false) {
+  const text = jsonl ? data.map((d) => JSON.stringify(d)).join('\n') + '\n' : JSON.stringify(data, null, 2)
+  const blob = new Blob([text], { type: jsonl ? 'application/x-ndjson' : 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

@@ -14,6 +14,18 @@ export default defineConfig({
       '@utils': path.resolve(__dirname, './src/utils'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom'],
+          charts: ['recharts'],
+          motion: ['framer-motion'],
+          socket: ['socket.io-client'],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     host: true,

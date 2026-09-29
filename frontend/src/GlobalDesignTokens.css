@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 /* ============================================
-   THREAT_OPS.AI - Base Styles
-   Dark-mode-first glassmorphism design system
+   IronDome.ai - Base Styles
+   Dark-mode-first glassmorphism design system for the passive-sensor dashboard
    ============================================ */
 
 @layer base {
@@ -222,7 +222,7 @@
 .ambient-bg {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: -1;   /* behind all in-flow content (it is opaque); #root is the stacking context */
   pointer-events: none;
   overflow: hidden;
   background: #0a0e1a;

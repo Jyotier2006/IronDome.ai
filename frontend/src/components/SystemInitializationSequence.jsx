@@ -2,12 +2,12 @@ import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const BOOT_LINES = [
-  { label: 'Ingest Service', detail: 'telemetry uplink :8001' },
-  { label: 'Detection Engine', detail: '7 rules + ML layer :8002' },
-  { label: 'Alert Manager', detail: 'correlation pipeline :8003' },
-  { label: 'Response Engine', detail: 'playbooks armed :8004' },
-  { label: 'IronDome Model Service', detail: 'threat brains :8006' },
-  { label: 'Socket Uplink', detail: 'dashboard realtime channel' },
+  { label: 'Flow collector', detail: 'UDP/2055 receive-only' },
+  { label: 'Flow assembler', detail: 'NetFlow v5 · biflow · PCAP' },
+  { label: 'Feature extractors', detail: '7 streaming windows' },
+  { label: 'Calibrated ML models', detail: 'PS classes a-f' },
+  { label: 'Alert correlator', detail: 'standard schema v1.0' },
+  { label: 'Return path', detail: 'none - by design' },
 ]
 
 const LINE_INTERVAL = 220
@@ -116,7 +116,7 @@ export default function BootSequence({ onDone }) {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4, duration: 0.5 }}
             >
-              IronDome.ai Security Operations Center
+              Passive threat intelligence · SIH PS 26145
             </motion.p>
 
             {/* Boot log */}
@@ -156,7 +156,7 @@ export default function BootSequence({ onDone }) {
                   animate={{ opacity: 1 }}
                   className="text-caption font-mono tracking-[0.2em] text-accent-green uppercase"
                 >
-                  All systems operational
+                  Monitoring the one-way feed
                 </motion.p>
               )}
             </AnimatePresence>

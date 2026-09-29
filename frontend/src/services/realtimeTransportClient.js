@@ -1,311 +1,124 @@
+// ============================================
+// IronDome.ai - realtime feed from the passive sensor (Socket.IO)
+// The dashboard only *receives*: hello, flow_stats, flows_batch, alert,
+// alert_update, scenario. There is no command channel to the network.
+// ============================================
 import { io } from 'socket.io-client'
-import { mockAlerts, mockTelemetry, mockDevices } from '@mock/mockTelemetryDataset'
+import { mockFlow, mockHello, mockIncident, MOCK_SCENARIOS } from '@mock/mockTrafficDataset'
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://127.0.0.1:3001'
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+export const SENSOR_URL = import.meta.env.VITE_SENSOR_URL || `http://${window.location.hostname || '127.0.0.1'}:3001`
 
-class MockEventEmitter {
+// ---------- offline demo emitter (same event names and payloads) ----------
+class MockSensor {
   constructor() {
     this.listeners = new Map()
     this.connected = false
-    this.intervals = []
+    this.timers = []
+    this.total = 0
+    this.bytes = 0
+    this.attack = null
   }
 
-  on(event, callback) {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, [])
-    }
-    this.listeners.get(event).push(callback)
+  on(ev, cb) {
+    if (!this.listeners.has(ev)) this.listeners.set(ev, new Set())
+    this.listeners.get(ev).add(cb)
     return this
   }
 
-  off(event, callback) {
-    if (this.listeners.has(event)) {
-      const callbacks = this.listeners.get(event)
-      const index = callbacks.indexOf(callback)
-      if (index > -1) {
-        callbacks.splice(index, 1)
-      }
-    }
+  off(ev, cb) {
+    this.listeners.get(ev)?.delete(cb)
     return this
   }
 
-  emit(event, data) {
-    if (this.listeners.has(event)) {
-      this.listeners.get(event).forEach(callback => callback(data))
-    }
-    return this
+  emitLocal(ev, data) {
+    this.listeners.get(ev)?.forEach((cb) => cb(data))
   }
 
   connect() {
+    if (this.connected) return this
     this.connected = true
-    setTimeout(() => this.emit('connect'), 100)
-    this._startMockStreams()
+    setTimeout(() => {
+      this.emitLocal('connect')
+      this.emitLocal('hello', mockHello())
+      this.emitLocal('incidents_snapshot', ['port_scan', 'dga'].map((s) => mockIncident(s)))
+      this.emitLocal('flows_snapshot', Array.from({ length: 30 }, mockFlow))
+    }, 150)
+    this.timers.push(setInterval(() => this.tick(), 1000))
+    this.timers.push(setInterval(() => {
+      if (!this.attack && Math.random() < 0.35) this.inject(MOCK_SCENARIOS[Math.floor(Math.random() * 12)].id, true)
+    }, 20000))
     return this
   }
 
   disconnect() {
     this.connected = false
-    this.intervals.forEach(clearInterval)
-    this.intervals = []
-    this.emit('disconnect')
-    return this
+    this.timers.forEach(clearInterval)
+    this.timers = []
+    this.emitLocal('disconnect')
   }
 
-  _prevMetrics = { cpu: 50, memory: 55, network: 500 }
-
-  _startMockStreams() {
-    const telemetryInterval = setInterval(() => {
-      if (!this.connected) return
-
-      const randomDevice = mockDevices[Math.floor(Math.random() * mockDevices.length)]
-
-      const lerp = (current, target, factor) => current + (target - current) * factor
-      const targetCpu = 30 + Math.random() * 60
-      const targetMemory = 40 + Math.random() * 45
-      const targetNetwork = 100 + Math.random() * 800
-
-      this._prevMetrics = {
-        cpu: lerp(this._prevMetrics.cpu, targetCpu, 0.3),
-        memory: lerp(this._prevMetrics.memory, targetMemory, 0.2),
-        network: lerp(this._prevMetrics.network, targetNetwork, 0.25),
-      }
-
-      const telemetryPoint = {
-        deviceId: randomDevice.id,
-        deviceName: randomDevice.name,
-        timestamp: new Date().toISOString(),
-        metrics: {
-          cpu: this._prevMetrics.cpu,
-          memory: this._prevMetrics.memory,
-          network: this._prevMetrics.network,
-          requests: Math.floor(Math.random() * 500),
-        }
-      }
-      this.emit('telemetry', telemetryPoint)
-    }, 500)
-    this.intervals.push(telemetryInterval)
-
-    const alertInterval = setInterval(() => {
-      if (!this.connected) return
-
-      if (Math.random() > 0.3) return
-
-      const severities = ['normal', 'warning', 'critical']
-      const alertTypes = [
-        'Unusual login pattern detected',
-        'High CPU usage spike',
-        'Failed authentication attempts',
-        'Suspicious network traffic',
-        'Service response timeout',
-        'Memory threshold exceeded',
-        'Unauthorized access attempt',
-      ]
-
-      const newAlert = {
-        id: `alert-${Date.now()}`,
-        title: alertTypes[Math.floor(Math.random() * alertTypes.length)],
-        severity: severities[Math.floor(Math.random() * severities.length)],
-        source: mockDevices[Math.floor(Math.random() * mockDevices.length)].name,
-        timestamp: new Date().toISOString(),
-        acknowledged: false,
-      }
-      this.emit('alert', newAlert)
-    }, 15000 + Math.random() * 15000)
-    this.intervals.push(alertInterval)
-
-    const deviceInterval = setInterval(() => {
-      if (!this.connected) return
-
-      if (Math.random() > 0.2) return
-
-      const device = mockDevices[Math.floor(Math.random() * mockDevices.length)]
-      const statuses = ['online', 'degraded', 'offline']
-
-      this.emit('device:status', {
-        deviceId: device.id,
-        status: statuses[Math.floor(Math.random() * statuses.length)],
-        timestamp: new Date().toISOString(),
-      })
-    }, 30000)
-    this.intervals.push(deviceInterval)
-  }
-}
-
-let socket = null
-let mockSocket = null
-
-export const connectSocket = () => {
-  if (USE_MOCK) {
-    if (!mockSocket) {
-      mockSocket = new MockEventEmitter()
-    }
-    mockSocket.connect()
-    return mockSocket
-  }
-
-  if (!socket) {
-    socket = io(SOCKET_URL, {
-      transports: ['websocket', 'polling'],
-      autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
+  tick() {
+    const boost = this.attack && this.attack.scenario.includes('flood') ? 5 : 1
+    const fps = (220 + Math.random() * 90) * boost
+    this.total += fps
+    this.bytes += fps * 9000
+    this.emitLocal('flow_stats', {
+      ts: Date.now() / 1000, flows_per_s: +fps.toFixed(1), pkts_per_s: Math.round(fps * 14), mbps: +(fps * 0.072).toFixed(2),
+      total_flows: Math.round(this.total), total_bytes: this.bytes, peak_flows_per_s: 0, target_flows_per_s: 5000,
+      encrypted_share: 0.61, dns_share: 0.24, protocol_mix: { TCP: 0.66, UDP: 0.33, ICMP: 0.01 },
+      latency: { p50_ms: 1150, p95_ms: 1680, max_ms: 1900, samples: 40 }, context_age_s: 900, baseline_learning: false,
+      open_incidents: 2, shed: 0, uptime_s: 0,
     })
+    this.emitLocal('flows_batch', Array.from({ length: 8 }, mockFlow))
+    if (this.attack && Date.now() > this.attack.alertAt && !this.attack.sent) {
+      this.attack.sent = true
+      this.emitLocal('alert', mockIncident(this.attack.scenario, this.attack))
+    }
+    if (this.attack && Date.now() > this.attack.end) this.attack = null
   }
 
-  socket.connect()
+  inject(scenario, auto = false) {
+    const meta = MOCK_SCENARIOS.find((s) => s.id === scenario) || MOCK_SCENARIOS[0]
+    const run = {
+      id: Math.random().toString(16).slice(2, 14), scenario: meta.id, title: meta.title, tool: meta.tool,
+      ps_ref: meta.ps_ref, threat_class: meta.threat_class, attacker: `198.51.100.${Math.floor(Math.random() * 250)}`,
+      host: `10.10.1.${10 + Math.floor(Math.random() * 48)}`, target: '10.10.2.80', intensity: 1,
+      start_wall: Date.now() / 1000, end_wall: Date.now() / 1000 + meta.duration,
+    }
+    this.attack = { ...run, alertAt: Date.now() + 2500 + Math.random() * 3000, end: Date.now() + meta.duration * 1000, sent: false }
+    this.emitLocal('scenario', { event: 'start', auto, ...run })
+    return run
+  }
+}
+
+// ---------- connection management ----------
+let socket = null
+
+export function getSocket() {
+  if (socket) return socket
+  socket = USE_MOCK
+    ? new MockSensor()
+    : io(SENSOR_URL, { transports: ['websocket', 'polling'], reconnection: true, reconnectionDelay: 1000, autoConnect: false })
   return socket
 }
 
-export const disconnectSocket = () => {
-  if (USE_MOCK && mockSocket) {
-    mockSocket.disconnect()
-    return
-  }
-
-  if (socket) {
-    socket.disconnect()
-  }
-}
-
-export const getSocket = () => {
-  if (USE_MOCK) {
-    return mockSocket
-  }
-  return socket
-}
-
-export const subscribeToTelemetry = (callback) => {
+export function connectSensor() {
   const s = getSocket()
-  if (s) {
-    s.on('telemetry', callback)
-  }
-  return () => {
-    if (s) s.off('telemetry', callback)
-  }
+  s.connect()
+  return s
 }
 
-export const subscribeToAlerts = (callback) => {
-  const s = getSocket()
-  if (s) {
-    s.on('alert', callback)
-  }
-  return () => {
-    if (s) s.off('alert', callback)
-  }
+export function disconnectSensor() {
+  if (socket) socket.disconnect()
 }
 
-export const subscribeToDeviceStatus = (callback) => {
+export function subscribe(event, cb) {
   const s = getSocket()
-  if (s) {
-    s.on('device:status', callback)
-  }
-  return () => {
-    if (s) s.off('device:status', callback)
-  }
+  s.on(event, cb)
+  return () => s.off(event, cb)
 }
 
-export const subscribeToSystemStatus = (callback) => {
-  const s = getSocket()
-  if (s) {
-    s.on('system:status', callback)
-  }
-  return () => {
-    if (s) s.off('system:status', callback)
-  }
-}
-
-export const onConnect = (callback) => {
-  const s = getSocket()
-  if (s) {
-    s.on('connect', callback)
-  }
-  return () => {
-    if (s) s.off('connect', callback)
-  }
-}
-
-export const onDisconnect = (callback) => {
-  const s = getSocket()
-  if (s) {
-    s.on('disconnect', callback)
-  }
-  return () => {
-    if (s) s.off('disconnect', callback)
-  }
-}
-
-export const onError = (callback) => {
-  const s = getSocket()
-  if (s) {
-    s.on('error', callback)
-  }
-  return () => {
-    if (s) s.off('error', callback)
-  }
-}
-
-// ==========================================
-// DROPPED PACKETS / IP BLOCKING EVENTS
-// ==========================================
-
-export const subscribeToDroppedPackets = (callback) => {
-  const s = getSocket()
-  if (s) {
-    s.on('ip:dropped', callback)
-  }
-  return () => {
-    if (s) s.off('ip:dropped', callback)
-  }
-}
-
-export const subscribeToIPBlocked = (callback) => {
-  const s = getSocket()
-  if (s) {
-    s.on('ip:blocked', callback)
-  }
-  return () => {
-    if (s) s.off('ip:blocked', callback)
-  }
-}
-
-export const subscribeToIPUnblocked = (callback) => {
-  const s = getSocket()
-  if (s) {
-    s.on('ip:unblocked', callback)
-  }
-  return () => {
-    if (s) s.off('ip:unblocked', callback)
-  }
-}
-
-export const subscribeToIPRateLimited = (callback) => {
-  const s = getSocket()
-  if (s) {
-    s.on('ip:rate_limited', callback)
-  }
-  return () => {
-    if (s) s.off('ip:rate_limited', callback)
-  }
-}
-
-export const subscribeToAttackBlocked = (callback) => {
-  const s = getSocket()
-  if (s) {
-    s.on('attack_blocked', callback)
-  }
-  return () => {
-    if (s) s.off('attack_blocked', callback)
-  }
-}
-
-export const subscribeToAttackRouted = (callback) => {
-  const s = getSocket()
-  if (s) {
-    s.on('attack_routed', callback)
-  }
-  return () => {
-    if (s) s.off('attack_routed', callback)
-  }
+export function mockInject(scenario) {
+  return USE_MOCK ? getSocket().inject(scenario) : null
 }

@@ -1,0 +1,8 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-socketio>=5.11.0
+pydantic>=2.10.0
+numpy>=1.26
+# must match the version the models were trained with (model_microservice/requirements.txt)
+scikit-learn==1.8.*
+joblib>=1.3

@@ -1,0 +1,26 @@
+{
+  "description": "JA3 fingerprints of known C2 client families. Pre-populated with the traffic lab's 'known' C2 families; extend with external threat-intel feeds (e.g. abuse.ch SSLBL).",
+  "generated_at": "2026-09-29T15:35:00+00:00",
+  "entries": [
+    {
+      "ja3": "47ad395473f3d93db904af2b983ca1b4",
+      "family": "mal_minimal",
+      "source": "irondome-lab"
+    },
+    {
+      "ja3": "bbafe4d3c06061974d8d828e0f7c492b",
+      "family": "mal_minimal",
+      "source": "irondome-lab"
+    },
+    {
+      "ja3": "c048339df1ff3446f5aca735364c1c05",
+      "family": "mal_legacy_ssl",
+      "source": "irondome-lab"
+    },
+    {
+      "ja3": "e19ed576935c9a898c80b07829d24589",
+      "family": "mal_legacy_ssl",
+      "source": "irondome-lab"
+    }
+  ]
+}

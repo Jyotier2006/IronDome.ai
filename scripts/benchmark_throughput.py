@@ -2,9 +2,11 @@
 
     # terminal 1 - sensor with the built-in lab off, so only benchmark traffic flows
     IRONDOME_LAB=off python backend/sensor-service/sensor_service.py
+    IRONDOME_LAB=off IRONDOME_WORKERS=4 python backend/sensor-service/sensor_service.py   # scale-out run
     # terminal 2
     python scripts/benchmark_throughput.py                  # default rate ladder
     python scripts/benchmark_throughput.py --rates 2000,5000,10000 --duration 20
+    python scripts/benchmark_throughput.py --report-only    # rebuild docs/THROUGHPUT.md from saved runs
 
 Method
   * a realistic mix of flow records (benign estate + floods, scan, DNS tunnel, beacon,
@@ -22,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import sys
 import time
@@ -88,9 +91,17 @@ def main():
     ap.add_argument("--sensor", default="127.0.0.1:2055")
     ap.add_argument("--rates", default="1000,2500,5000,7500,10000,15000")
     ap.add_argument("--duration", type=float, default=15.0)
+    ap.add_argument("--report-only", action="store_true", help="rewrite the report from saved results")
     args = ap.parse_args()
 
+    results_path = ROOT / "docs" / "throughput_results.json"
+    if args.report_only:
+        write_doc(load_runs(results_path))
+        print("-> docs/THROUGHPUT.md")
+        return
+
     health = api(args.api, "/health")
+    workers = (health.get("scale") or {}).get("workers", 0)
     if health.get("lab"):
         print("warning: the sensor's built-in lab is ON; lab flows add to the load (start it with IRONDOME_LAB=off)")
     print("building flow pool from the traffic lab ...", flush=True)
@@ -104,10 +115,12 @@ def main():
     results = []
     for rate in [int(x) for x in args.rates.split(",")]:
         before = udp_received(args.api)
+        shed_before = api(args.api, "/api/stats").get("shed", 0)
         sent, sent_bytes, idx = run_step(ex, pool, rate, args.duration, idx)
         time.sleep(2.0)                     # let the collector drain its socket buffer
-        received = udp_received(args.api) - before
         stats = api(args.api, "/api/stats")
+        # flows shed by an overloaded pipeline or worker queue count as lost too
+        received = udp_received(args.api) - before - (stats.get("shed", 0) - shed_before)
         lat = stats.get("latency") or {}
         loss = max(0.0, 1 - received / sent) if sent else 0.0
         row = {
@@ -134,58 +147,85 @@ def main():
 
     sustained = max((r for r in results if r["loss"] < LOSS_BUDGET and (r["p95_ms"] or 0) <= LATENCY_BUDGET_MS),
                     key=lambda r: r["processed_fps"], default=None)
-    meta = {
+    run = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "host": {"platform": platform.platform(), "python": platform.python_version(), "cpu": platform.processor()},
+        "workers": workers,
+        "host": {"platform": platform.platform(), "python": platform.python_version(), "cpu": platform.processor(),
+                 "logical_cpus": os.cpu_count()},
         "duration_s": args.duration, "loss_budget": LOSS_BUDGET, "latency_budget_ms": LATENCY_BUDGET_MS,
-        "mean_flow_kb": round(avg_bytes / 1e3, 1), "steps": results,
-        "sustained": sustained,
+        "steps": results, "sustained": sustained,
     }
+    runs = [r for r in load_runs(results_path) if r.get("workers", 0) != workers] + [run]
+    runs.sort(key=lambda r: r.get("workers", 0))
     (ROOT / "docs").mkdir(exist_ok=True)
-    (ROOT / "docs" / "throughput_results.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
-    write_doc(meta)
+    results_path.write_text(json.dumps({"runs": runs}, indent=2) + "\n", encoding="utf-8")
+    write_doc(runs)
     if sustained:
-        print(f"\nsustained: {sustained['processed_fps']:,} flows/s (~{sustained['monitored_mbps']:,} Mbps of monitored "
-              f"traffic) with {100 * sustained['loss']:.2f}% loss and p95 alert latency {sustained['p95_ms']} ms")
+        print(f"\nsustained: {sustained['processed_fps']:,} flows/s with {100 * sustained['loss']:.2f}% loss "
+              f"and p95 alert latency {sustained['p95_ms']} ms ({'single process' if not workers else f'{workers} workers'})")
     print("-> docs/THROUGHPUT.md")
 
 
-def write_doc(meta):
-    s = meta["sustained"]
+def load_runs(path):
+    if not path.exists():
+        return []
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    if "runs" in doc:
+        return doc["runs"]
+    doc.setdefault("workers", 0)          # older single-run format
+    return [doc]
+
+
+def _label(run):
+    return "single process" if not run.get("workers") else f"{run['workers']} worker processes"
+
+
+def write_doc(runs):
     L = ["# Throughput", "",
          "PS constraint (d) asks every solution to state and demonstrate the traffic rate it was tested against. "
-         "This file is written by `scripts/benchmark_throughput.py`.", "",
+         "This file is written by `scripts/benchmark_throughput.py`. Throughput is stated in **flow records per "
+         "second**, the unit the PS accepts. Bandwidth is not quoted, because it depends entirely on the flow-size "
+         "mix of the (simulated) traffic.", "",
          "## Method", "",
          "- A realistic flow mix from the traffic lab (48-workstation estate at 3× scale, plus SYN flood, port scan, "
          "DNS tunnel, C2 beacon and exfiltration) is re-timed to look live.",
          "- For each target rate it is exported **one-way over UDP** to the sensor's receive-only collector in "
-         "MTU-sized datagrams (≤ 1400 bytes, about 4–5 flows each) — the same path a flow exporter behind a data diode uses.",
-         f"- Each step runs {meta['duration_s']:.0f} s. The sensor's own counters give the flows it received and "
-         "processed (feature extraction, model inference, correlation and alerting all included), so loss is measured, "
-         "not assumed.",
-         f"- A step passes if loss < {100 * meta['loss_budget']:.1f}% and p95 alert latency ≤ {meta['latency_budget_ms'] / 1000:.0f} s.",
-         "", "## Results", "",
-         f"_Measured {meta['generated_at']} on {meta['host']['platform']} (Python {meta['host']['python']}), sender and "
-         "sensor on the same machine, single sensor process._", "",
-         "| Target flows/s | Sent flows/s | Processed flows/s | Loss | p95 alert latency | Monitored traffic |",
-         "|---|---|---|---|---|---|"]
-    for r in meta["steps"]:
-        p95 = f"{r['p95_ms'] / 1000:.2f} s" if r["p95_ms"] is not None else "-"
-        L.append(f"| {r['target_fps']:,} | {r['achieved_send_fps']:,} | {r['processed_fps']:,} | {100 * r['loss']:.2f}% | "
-                 f"{p95} | ~{r['monitored_mbps']:,} Mbps |")
-    L += ["", "## Stated target", ""]
-    if s:
-        L.append(f"**Sustained: {s['processed_fps']:,} flow records per second per sensor process** "
-                 f"(~{s['monitored_mbps']:,} Mbps of monitored traffic at a mean of {meta['mean_flow_kb']} KB per flow), "
-                 f"with {100 * s['loss']:.2f}% loss and p95 alert latency {s['p95_ms'] / 1000:.2f} s.")
-    else:
-        L.append("No step met both budgets on this machine - see the table.")
-    L += ["", "## Scaling beyond one process (not yet implemented)", "",
-          "The figure above is for one sensor process. Scaling out is roadmap work, and not simply a matter of "
-          "hash-sharding flows: some detectors aggregate across hosts (horizontal sweeps span many destinations; "
-          "prevalence counts how many internal hosts contact a destination), so a multi-process deployment needs "
-          "flows partitioned by protected host *and* a shared estate-context store (prevalence, host baselines) "
-          "that all partitions read.", ""]
+         "MTU-sized datagrams (≤ 1400 bytes, about 4–5 flows each), the same path a flow exporter behind a data diode uses.",
+         "- The sensor's own counters give the flows it received and processed (feature extraction, model inference, "
+         "correlation and alerting all included), so loss is measured, not assumed.",
+         f"- A step passes if loss < {100 * LOSS_BUDGET:.1f}% and p95 alert latency ≤ {LATENCY_BUDGET_MS / 1000:.0f} s.",
+         ""]
+    L += ["## Stated target", ""]
+    for run in runs:
+        s = run.get("sustained")
+        if s:
+            L.append(f"- **{_label(run)}: {s['processed_fps']:,} flow records per second**, "
+                     f"{100 * s['loss']:.2f}% loss, p95 alert latency {s['p95_ms'] / 1000:.2f} s.")
+        else:
+            L.append(f"- {_label(run)}: no step met both budgets on this machine (see the table).")
+    for run in runs:
+        L += ["", f"## Results: {_label(run)}", "",
+              f"_Measured {run['generated_at']} on {run['host']['platform']} (Python {run['host']['python']}"
+              + (f", {run['host']['logical_cpus']} logical CPUs" if run['host'].get('logical_cpus') else "")
+              + f"), sender and sensor on the same machine, {run['duration_s']:.0f} s per step._", "",
+              "| Target flows/s | Sent flows/s | Processed flows/s | Loss | p95 alert latency | Result |",
+              "|---|---|---|---|---|---|"]
+        for r in run["steps"]:
+            p95 = f"{r['p95_ms'] / 1000:.2f} s" if r["p95_ms"] is not None else "-"
+            ok = r["loss"] < LOSS_BUDGET and (r["p95_ms"] or 0) <= LATENCY_BUDGET_MS
+            L.append(f"| {r['target_fps']:,} | {r['achieved_send_fps']:,} | {r['processed_fps']:,} | "
+                     f"{100 * r['loss']:.2f}% | {p95} | {'within budget' if ok else 'over budget'} |")
+    L += ["", "## How scale-out works", "",
+          "With `IRONDOME_WORKERS=N`, feature extraction and inference run in N worker processes. Flows are "
+          "partitioned by protected host (and by initiator for scan detection), and the main process keeps the "
+          "shared estate context (prevalence, context age) and attaches it to every routed flow. See "
+          "`ARCHITECTURE.md`, section 3. Ingest, routing and correlation remain in one process, which bounds the "
+          "gain; scaling across machines would need that context in a shared store.", "",
+          "Loss counts every flow the collector received but a pipeline or worker queue shed. With workers, the "
+          "limit is latency rather than loss: partitioning by protected host sends all traffic aimed at one very "
+          "busy host (here the web server that is also the flood victim) to one worker, which then lags. In the "
+          "4-worker run that worker handled about 600k of the 1.17M routed records while the other three handled "
+          "about 200k each, so p95 latency, not loss, sets the budgeted rate.", ""]
     (ROOT / "docs" / "THROUGHPUT.md").write_text("\n".join(L) + "\n", encoding="utf-8")
 
 

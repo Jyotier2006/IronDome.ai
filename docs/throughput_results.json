@@ -1,74 +1,166 @@
 {
-  "generated_at": "2026-09-29T15:33:35+00:00",
-  "host": {
-    "platform": "Windows-11-10.0.26200-SP0",
-    "python": "3.14.2",
-    "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel"
-  },
-  "duration_s": 15.0,
-  "loss_budget": 0.005,
-  "latency_budget_ms": 3000,
-  "mean_flow_kb": 52.2,
-  "steps": [
+  "runs": [
     {
-      "target_fps": 1000,
-      "sent": 14998,
-      "achieved_send_fps": 1000,
-      "received": 14998,
-      "processed_fps": 1000,
-      "loss": 0.0,
-      "monitored_mbps": 579.3,
-      "p50_ms": null,
-      "p95_ms": null,
-      "datagrams": 5630
+      "generated_at": "2026-09-29T18:41:19+00:00",
+      "workers": 0,
+      "host": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.14.2",
+        "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+        "logical_cpus": 20
+      },
+      "duration_s": 15.0,
+      "loss_budget": 0.005,
+      "latency_budget_ms": 3000,
+      "steps": [
+        {
+          "target_fps": 1000,
+          "sent": 14999,
+          "achieved_send_fps": 1000,
+          "received": 14999,
+          "processed_fps": 1000,
+          "loss": 0.0,
+          "monitored_mbps": 579.4,
+          "p50_ms": null,
+          "p95_ms": null,
+          "datagrams": 6052
+        },
+        {
+          "target_fps": 2500,
+          "sent": 37497,
+          "achieved_send_fps": 2500,
+          "received": 37497,
+          "processed_fps": 2500,
+          "loss": 0.0,
+          "monitored_mbps": 639.3,
+          "p50_ms": 960.0,
+          "p95_ms": 972.7,
+          "datagrams": 17546
+        },
+        {
+          "target_fps": 5000,
+          "sent": 74992,
+          "achieved_send_fps": 4999,
+          "received": 74992,
+          "processed_fps": 4999,
+          "loss": 0.0,
+          "monitored_mbps": 1083.0,
+          "p50_ms": 610.9,
+          "p95_ms": 2343.2,
+          "datagrams": 36123
+        },
+        {
+          "target_fps": 7500,
+          "sent": 112479,
+          "achieved_send_fps": 7499,
+          "received": 37241,
+          "processed_fps": 2483,
+          "loss": 0.6689,
+          "monitored_mbps": 4458.1,
+          "p50_ms": 631.4,
+          "p95_ms": 6749.1,
+          "datagrams": 66061
+        }
+      ],
+      "sustained": {
+        "target_fps": 5000,
+        "sent": 74992,
+        "achieved_send_fps": 4999,
+        "received": 74992,
+        "processed_fps": 4999,
+        "loss": 0.0,
+        "monitored_mbps": 1083.0,
+        "p50_ms": 610.9,
+        "p95_ms": 2343.2,
+        "datagrams": 36123
+      }
     },
     {
-      "target_fps": 2500,
-      "sent": 37495,
-      "achieved_send_fps": 2500,
-      "received": 37495,
-      "processed_fps": 2500,
-      "loss": 0.0,
-      "monitored_mbps": 639.4,
-      "p50_ms": 1108.6,
-      "p95_ms": 1131.5,
-      "datagrams": 16621
-    },
-    {
-      "target_fps": 5000,
-      "sent": 74985,
-      "achieved_send_fps": 4999,
-      "received": 74985,
-      "processed_fps": 4999,
-      "loss": 0.0,
-      "monitored_mbps": 1076.2,
-      "p50_ms": 978.1,
-      "p95_ms": 2658.7,
-      "datagrams": 34902
-    },
-    {
-      "target_fps": 7500,
-      "sent": 112483,
-      "achieved_send_fps": 7499,
-      "received": 71674,
-      "processed_fps": 4778,
-      "loss": 0.3628,
-      "monitored_mbps": 4464.8,
-      "p50_ms": 1080.7,
-      "p95_ms": 3151.6,
-      "datagrams": 64667
+      "generated_at": "2026-09-29T18:43:04+00:00",
+      "workers": 4,
+      "host": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.14.2",
+        "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+        "logical_cpus": 20
+      },
+      "duration_s": 15.0,
+      "loss_budget": 0.005,
+      "latency_budget_ms": 3000,
+      "steps": [
+        {
+          "target_fps": 5000,
+          "sent": 74987,
+          "achieved_send_fps": 4999,
+          "received": 74987,
+          "processed_fps": 4999,
+          "loss": 0.0,
+          "monitored_mbps": 1338.4,
+          "p50_ms": 974.2,
+          "p95_ms": 1005.7,
+          "datagrams": 18720
+        },
+        {
+          "target_fps": 7500,
+          "sent": 112497,
+          "achieved_send_fps": 7500,
+          "received": 112497,
+          "processed_fps": 7500,
+          "loss": 0.0,
+          "monitored_mbps": 3401.2,
+          "p50_ms": 1056.2,
+          "p95_ms": 5028.2,
+          "datagrams": 47686
+        },
+        {
+          "target_fps": 10000,
+          "sent": 149997,
+          "achieved_send_fps": 10000,
+          "received": 149997,
+          "processed_fps": 10000,
+          "loss": 0.0,
+          "monitored_mbps": 3556.5,
+          "p50_ms": 926.6,
+          "p95_ms": 5028.2,
+          "datagrams": 84083
+        },
+        {
+          "target_fps": 12500,
+          "sent": 187476,
+          "achieved_send_fps": 12498,
+          "received": 187476,
+          "processed_fps": 12498,
+          "loss": 0.0,
+          "monitored_mbps": 5024.4,
+          "p50_ms": 857.0,
+          "p95_ms": 3297.8,
+          "datagrams": 129813
+        },
+        {
+          "target_fps": 15000,
+          "sent": 224998,
+          "achieved_send_fps": 15000,
+          "received": 224998,
+          "processed_fps": 15000,
+          "loss": 0.0,
+          "monitored_mbps": 6536.4,
+          "p50_ms": 853.8,
+          "p95_ms": 3891.7,
+          "datagrams": 185093
+        }
+      ],
+      "sustained": {
+        "target_fps": 5000,
+        "sent": 74987,
+        "achieved_send_fps": 4999,
+        "received": 74987,
+        "processed_fps": 4999,
+        "loss": 0.0,
+        "monitored_mbps": 1338.4,
+        "p50_ms": 974.2,
+        "p95_ms": 1005.7,
+        "datagrams": 18720
+      }
     }
-  ],
-  "sustained": {
-    "target_fps": 5000,
-    "sent": 74985,
-    "achieved_send_fps": 4999,
-    "received": 74985,
-    "processed_fps": 4999,
-    "loss": 0.0,
-    "monitored_mbps": 1076.2,
-    "p50_ms": 978.1,
-    "p95_ms": 2658.7,
-    "datagrams": 34902
-  }
+  ]
 }

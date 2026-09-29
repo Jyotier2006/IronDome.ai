@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-29T15:40:46+00:00",
+  "generated_at": "2026-09-29T18:52:22+00:00",
   "repeats": 3,
   "detector_modes": {
     "ddos": "ml",
@@ -10,7 +10,7 @@
     "recon_scan": "ml",
     "exfiltration": "ml"
   },
-  "seconds": 332.6,
+  "seconds": 478.1,
   "scenarios": [
     {
       "scenario": "syn_flood",
@@ -19,11 +19,9 @@
       "detected": 3,
       "detection_rate": 1.0,
       "median_ttd": 2.0,
-      "fps": 0.3,
-      "off_classes": {
-        "encrypted_malware": 1
-      },
-      "flows_per_s": 12214,
+      "fps": 0.0,
+      "off_classes": {},
+      "flows_per_s": 10357,
       "schema_errors": 0
     },
     {
@@ -33,11 +31,9 @@
       "detected": 3,
       "detection_rate": 1.0,
       "median_ttd": 2.0,
-      "fps": 0.3,
-      "off_classes": {
-        "encrypted_malware": 1
-      },
-      "flows_per_s": 10402,
+      "fps": 0.0,
+      "off_classes": {},
+      "flows_per_s": 8896,
       "schema_errors": 0
     },
     {
@@ -47,11 +43,9 @@
       "detected": 3,
       "detection_rate": 1.0,
       "median_ttd": 2.0,
-      "fps": 0.3,
-      "off_classes": {
-        "encrypted_malware": 1
-      },
-      "flows_per_s": 10128,
+      "fps": 0.0,
+      "off_classes": {},
+      "flows_per_s": 8247,
       "schema_errors": 0
     },
     {
@@ -61,11 +55,9 @@
       "detected": 3,
       "detection_rate": 1.0,
       "median_ttd": 2.0,
-      "fps": 0.3,
-      "off_classes": {
-        "encrypted_malware": 1
-      },
-      "flows_per_s": 8475,
+      "fps": 0.0,
+      "off_classes": {},
+      "flows_per_s": 7103,
       "schema_errors": 0
     },
     {
@@ -75,11 +67,9 @@
       "detected": 3,
       "detection_rate": 1.0,
       "median_ttd": 12.0,
-      "fps": 0.3,
-      "off_classes": {
-        "encrypted_malware": 1
-      },
-      "flows_per_s": 5913,
+      "fps": 0.0,
+      "off_classes": {},
+      "flows_per_s": 4667,
       "schema_errors": 0
     },
     {
@@ -89,11 +79,9 @@
       "detected": 3,
       "detection_rate": 1.0,
       "median_ttd": 1.1,
-      "fps": 0.3,
-      "off_classes": {
-        "encrypted_malware": 1
-      },
-      "flows_per_s": 5588,
+      "fps": 0.0,
+      "off_classes": {},
+      "flows_per_s": 3161,
       "schema_errors": 0
     },
     {
@@ -103,13 +91,11 @@
       "detected": 3,
       "detection_rate": 1.0,
       "median_ttd": 1.4,
-      "fps": 1.7,
+      "fps": 1.0,
       "off_classes": {
-        "recon_scan": 3,
-        "volumetric_ddos": 1,
-        "encrypted_malware": 1
+        "recon_scan": 3
       },
-      "flows_per_s": 5530,
+      "flows_per_s": 1971,
       "schema_errors": 0
     },
     {
@@ -119,11 +105,9 @@
       "detected": 3,
       "detection_rate": 1.0,
       "median_ttd": 36.0,
-      "fps": 0.3,
-      "off_classes": {
-        "encrypted_malware": 1
-      },
-      "flows_per_s": 4754,
+      "fps": 0.0,
+      "off_classes": {},
+      "flows_per_s": 3823,
       "schema_errors": 0
     },
     {
@@ -132,12 +116,10 @@
       "runs": 3,
       "detected": 3,
       "detection_rate": 1.0,
-      "median_ttd": 2.9,
-      "fps": 0.3,
-      "off_classes": {
-        "encrypted_malware": 1
-      },
-      "flows_per_s": 4595,
+      "median_ttd": 1.6,
+      "fps": 0.0,
+      "off_classes": {},
+      "flows_per_s": 3470,
       "schema_errors": 0
     },
     {
@@ -147,12 +129,9 @@
       "detected": 3,
       "detection_rate": 1.0,
       "median_ttd": 1.1,
-      "fps": 0.7,
-      "off_classes": {
-        "volumetric_ddos": 1,
-        "encrypted_malware": 1
-      },
-      "flows_per_s": 4967,
+      "fps": 0.0,
+      "off_classes": {},
+      "flows_per_s": 4421,
       "schema_errors": 0
     },
     {
@@ -162,12 +141,9 @@
       "detected": 3,
       "detection_rate": 1.0,
       "median_ttd": 3.2,
-      "fps": 0.7,
-      "off_classes": {
-        "encrypted_malware": 1,
-        "volumetric_ddos": 1
-      },
-      "flows_per_s": 5170,
+      "fps": 0.0,
+      "off_classes": {},
+      "flows_per_s": 4451,
       "schema_errors": 0
     },
     {
@@ -177,25 +153,21 @@
       "detected": 3,
       "detection_rate": 1.0,
       "median_ttd": 10.0,
-      "fps": 0.3,
-      "off_classes": {
-        "encrypted_malware": 1
-      },
-      "flows_per_s": 5217,
+      "fps": 0.0,
+      "off_classes": {},
+      "flows_per_s": 4370,
       "schema_errors": 0
     }
   ],
   "benign": {
     "minutes": 15.0,
     "records": 109279,
-    "false_alerts": 1,
-    "fp_per_hour": 4.0,
-    "false_incidents": 1,
-    "incidents_per_hour": 4.0,
+    "false_alerts": 0,
+    "fp_per_hour": 0.0,
+    "false_incidents": 0,
+    "incidents_per_hour": 0.0,
     "cold_start_alerts": 0,
-    "by_class": {
-      "volumetric_ddos": 1
-    },
-    "flows_per_s": 5079.0
+    "by_class": {},
+    "flows_per_s": 4263.0
   }
 }

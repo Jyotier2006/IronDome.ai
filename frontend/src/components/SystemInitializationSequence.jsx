@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 const BOOT_LINES = [
   { label: 'Flow collector', detail: 'UDP/2055 receive-only' },
-  { label: 'Flow assembler', detail: 'NetFlow v5 · biflow · PCAP' },
+  { label: 'Flow assembler', detail: 'NetFlow v5/v9 · IPFIX · sFlow · biflow · PCAP' },
   { label: 'Feature extractors', detail: '7 streaming windows' },
   { label: 'Calibrated ML models', detail: 'PS classes a-f' },
   { label: 'Alert correlator', detail: 'standard schema v1.0' },

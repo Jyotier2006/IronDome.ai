@@ -154,7 +154,7 @@ function IncidentForensicsModal({ incident, isOpen, acked, onClose, onAcknowledg
                     <KV k="Threat class" v={`(${info.ps}) ${info.label}`} />
                     <KV k="Technique" v={incident.technique} mono />
                     <KV k="Detector" v={det.model || det.name} />
-                    <KV k="Mode" v={det.mode === 'ml+intel' ? 'ML + threat intel' : det.mode} />
+                    <KV k="Mode" v={det.mode === 'ml+intel' ? 'ML + threat intel' : det.mode === 'ml+behaviour' ? 'ML + NXDOMAIN behaviour' : det.mode} />
                     <KV k="Confidence vs threshold" v={`${(incident.confidence * 100).toFixed(1)}% ≥ ${((det.threshold ?? 0) * 100).toFixed(1)}%`} />
                     {incident.latency_ms != null && <KV k="Processing latency" v={`${(incident.latency_ms / 1000).toFixed(2)} s`} />}
                     <div className="flex justify-between gap-3 py-0.5 text-[12px]">

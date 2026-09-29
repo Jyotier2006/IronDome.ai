@@ -29,6 +29,11 @@ function IngestSourcesPanel({ meta, stats, connected, incidentStats, activeClass
                 {fmtCompact(s.records)} flows
                 {s.id === 'udp' && <> · {fmtCompact(s.datagrams)} datagrams{s.exporters ? ` · ${s.exporters} exporter(s)` : ''}</>}
               </p>
+              {s.formats && Object.values(s.formats).some(Boolean) && (
+                <p className="text-[10px] text-text-muted font-mono mt-0.5 truncate">
+                  {Object.entries(s.formats).filter(([, n]) => n).map(([f, n]) => `${f.replace('_', ' ')} ${fmtCompact(n)}`).join(' · ')}
+                </p>
+              )}
             </div>
           ))}
           {!sources.length && <p className="text-[11px] text-text-muted">{connected ? 'Loading…' : 'Sensor not connected'}</p>}

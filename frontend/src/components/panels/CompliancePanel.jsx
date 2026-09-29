@@ -33,7 +33,7 @@ function CompliancePanel({ meta, stats, peak, incidentStats, incidents }) {
       'No block / isolate / rate-limit endpoint exists; recommendations are out-of-band only',
     ],
     b: [
-      `decrypts_payload=${String(meta?.decrypts_payload ?? false)} · ${fmtPct(stats?.encrypted_share)} of flows encrypted`,
+      `decrypts_payload=${String(meta?.decrypts_payload ?? false)} · ${fmtPct(stats?.encrypted_share)} of flows encrypted (TLS/QUIC), ${fmtPct(stats?.handshake_share)} with handshake metadata`,
       'Features: JA3 / JA3S / JA4 fingerprints, SNI & ALPN presence, packet-size & timing sequences (SPLT)',
       'Flow records carry no payload field at all',
     ],
@@ -61,7 +61,7 @@ function CompliancePanel({ meta, stats, peak, incidentStats, incidents }) {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <Stage icon="oneway" title="1 · One-way ingest" lines={[
             udp?.transport || 'UDP receive-only',
-            'NetFlow v5 · biflow JSON · PCAP replay',
+            'NetFlow v5/v9 · IPFIX · sFlow · biflow JSON · PCAP replay',
             `${fmtCompact(stats?.total_flows)} flows since start`,
           ]} />
           <Stage icon="grid" title="2 · Streaming features" lines={[

@@ -182,7 +182,7 @@ export function mockHello() {
     detector_modes: { ddos: 'ml', recon_scan: 'ml', c2_beacon: 'ml', dga_domain: 'ml', dns_tunnel: 'ml', encrypted_malware: 'ml', exfiltration: 'ml' },
     sources: [
       { id: 'lab', kind: 'built-in traffic lab', transport: 'in-process', enabled: true, records: 0 },
-      { id: 'udp', kind: 'flow collector (NetFlow v5 / JSON)', transport: 'UDP/2055 receive-only', enabled: true, records: 0, datagrams: 0, errors: 0, exporters: 0 },
+      { id: 'udp', kind: 'flow collector (NetFlow v5/v9, IPFIX, sFlow, JSON)', transport: 'UDP/2055 receive-only', enabled: true, records: 0, datagrams: 0, errors: 0, exporters: 0 },
       { id: 'http', kind: 'REST flow upload', transport: 'HTTP POST /api/ingest/flows', enabled: true, records: 0 },
     ],
     stats: {}, active_runs: [],

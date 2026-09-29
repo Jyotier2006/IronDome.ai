@@ -73,8 +73,8 @@ function OverviewPanel({ stats, history, peak, meta, incidentStats, runs, onSele
             }} />
           </div>
         </StatTile>
-        <StatTile label="Encrypted flows" value={fmtPct(stats?.encrypted_share)}
-                  note="metadata only" />
+        <StatTile label="Encrypted traffic (TLS/QUIC)" value={fmtPct(stats?.encrypted_byte_share)}
+                  note={`of bytes · ${fmtPct(stats?.encrypted_share)} of flows · ${fmtPct(stats?.handshake_share)} handshake seen`} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -122,12 +122,13 @@ function OverviewPanel({ stats, history, peak, meta, incidentStats, runs, onSele
             {proto.map(({ p, share }) => <ShareBar key={p} label={p} share={share} />)}
           </div>
           <div className="mt-3 pt-3 border-t border-white/[0.06] space-y-2">
-            <ShareBar label="Encrypted" share={stats?.encrypted_share} />
+            <ShareBar label="Encrypted (TLS/QUIC)" share={stats?.encrypted_share} />
+            <ShareBar label="Handshake seen" share={stats?.handshake_share} />
             <ShareBar label="DNS" share={stats?.dns_share} />
           </div>
           <p className="mt-3 text-[11px] text-text-muted flex items-start gap-1.5">
             <Icon name="lock" className="w-3.5 h-3.5 mt-px shrink-0" />
-            Shares of flows seen by the passive sensor. Encrypted sessions are profiled from handshake metadata and packet-size / timing only.
+            Shares of flows seen by the passive sensor. Encrypted = TLS/QUIC by port or handshake; "handshake seen" = flows whose ClientHello metadata (JA3/JA4, SNI) was captured. Sessions are profiled from that metadata and packet sizes / timing only.
           </p>
         </div>
       </div>

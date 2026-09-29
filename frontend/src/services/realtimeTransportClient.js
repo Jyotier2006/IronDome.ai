@@ -66,7 +66,7 @@ class MockSensor {
     this.emitLocal('flow_stats', {
       ts: Date.now() / 1000, flows_per_s: +fps.toFixed(1), pkts_per_s: Math.round(fps * 14), mbps: +(fps * 0.072).toFixed(2),
       total_flows: Math.round(this.total), total_bytes: this.bytes, peak_flows_per_s: 0, target_flows_per_s: 5000,
-      encrypted_share: 0.61, dns_share: 0.24, protocol_mix: { TCP: 0.66, UDP: 0.33, ICMP: 0.01 },
+      encrypted_share: 0.76, encrypted_byte_share: 0.9, handshake_share: 0.07, dns_share: 0.12, protocol_mix: { TCP: 0.66, UDP: 0.33, ICMP: 0.01 },
       latency: { p50_ms: 1150, p95_ms: 1680, max_ms: 1900, samples: 40 }, context_age_s: 900, baseline_learning: false,
       open_incidents: 2, shed: 0, uptime_s: 0,
     })

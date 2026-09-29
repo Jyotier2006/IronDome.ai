@@ -1,5 +1,6 @@
 # Passive sensor: receive-only flow collector (UDP 2055) + dashboard API / Socket.IO (3001).
-# One replica: detectors keep per-process streaming state (see docs/THROUGHPUT.md).
+# One pod; scale-out happens inside it with IRONDOME_WORKERS detection processes that
+# share the estate context held by the main process (see ARCHITECTURE.md, section 3).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -9,6 +10,8 @@ metadata:
     app: sensor-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate            # the archive volume is ReadWriteOnce
   selector:
     matchLabels:
       app: sensor-service
@@ -22,6 +25,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 65534
         runAsGroup: 65534
+        fsGroup: 65534        # lets the unprivileged sensor write the archive volume
       containers:
         - name: sensor
           image: irondome-sensor:latest
@@ -34,12 +38,26 @@ spec:
               containerPort: 2055
               protocol: UDP
           env:
-            - name: IRONDOME_LAB            # built-in simulated traffic source; "off" = only external exporters
+            - name: IRONDOME_LAB             # built-in simulated traffic source; "off" = only real exporters
               value: "on"
             - name: IRONDOME_AUTO_SCENARIOS
               value: "on"
-            - name: IRONDOME_INTERNAL_CIDRS # the protected address space
+            - name: IRONDOME_LAB_JA3         # lab's simulated JA3 list; set "off" on a real network
+              value: "on"
+            - name: IRONDOME_WORKERS         # detection worker processes inside the pod
+              value: "2"
+            - name: IRONDOME_INTERNAL_CIDRS  # the protected address space
               value: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+            - name: IRONDOME_ARCHIVE_DIR     # signed, hash-chained alert archive
+              value: /var/lib/irondome/archive
+            - name: IRONDOME_ARCHIVE_KEY     # from the optional Secret; archive stays off without it
+              valueFrom:
+                secretKeyRef:
+                  name: irondome-archive
+                  key: signing-key
+                  optional: true
+            # - name: IRONDOME_SYSLOG        # SIEM inside the enclave (also allow it in network-policy.yaml)
+            #   value: "udp://siem.enclave.local:514"
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
@@ -49,27 +67,43 @@ spec:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 20
+            initialDelaySeconds: 25
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 20
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: archive
+              mountPath: /var/lib/irondome/archive
           resources:
             requests:
-              cpu: "1"
-              memory: 768Mi
-            limits:
               cpu: "2"
               memory: 1536Mi
+            limits:
+              cpu: "4"
+              memory: 3Gi
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: archive
+          persistentVolumeClaim:
+            claimName: sensor-archive
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sensor-archive
+  namespace: irondome
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
 ---
 apiVersion: v1
 kind: Service
@@ -90,8 +124,8 @@ spec:
       protocol: UDP
   type: ClusterIP
 ---
-# Flow exporters outside the cluster (probes, NetFlow routers, the diode's output side)
-# send to <node-ip>:30055/udp. kubectl port-forward cannot carry UDP, hence the NodePort.
+# Flow exporters outside the cluster (probes, routers, the diode's output side) send to
+# <node-ip>:30055/udp. kubectl port-forward cannot carry UDP, hence the NodePort.
 apiVersion: v1
 kind: Service
 metadata:

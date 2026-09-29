@@ -1,225 +1,91 @@
-# Kubernetes Setup Guide for Threat Ops Application
+# Running IronDome.ai on Kubernetes
 
-This guide walks you through containerizing and deploying the Threat Ops application using Docker and Kubernetes.
+Everything lives in the `irondome` namespace: the passive sensor, the dashboard, an
+egress-deny NetworkPolicy and a volume for the signed alert archive. Tested layout for a
+local cluster (Docker Desktop, kind or minikube); on a shared cluster, push the images to
+your registry and set `imagePullPolicy: IfNotPresent`.
 
-## Prerequisites
-- Docker Desktop (includes Kubernetes)
-- Git
-- kubectl (comes with Docker Desktop)
+```mermaid
+flowchart TB
+    subgraph NS["namespace irondome"]
+        FE["Deployment frontend ×2<br/>nginx · port 80"]
+        SE["Deployment sensor-service ×1<br/>non-root · read-only fs · IRONDOME_WORKERS=2"]
+        PVC["PVC sensor-archive"]
+        SEC["Secret irondome-archive<br/>(archive signing key)"]
+        NP["NetworkPolicy sensor-no-egress"]
+    end
+    EXP["Flow exporters / diode output"] -->|"UDP NodePort 30055"| SE
+    B["Browser"] -->|"port-forward 8080"| FE
+    B -->|"port-forward 3001 (REST + Socket.IO)"| SE
+    SE --- PVC
+    SEC -.-> SE
+    NP -.->|denies all egress| SE
+```
 
-## Quick Start
+## Quick start
 
-### Step 1: Build Images (One-time)
 ```bash
 cd k8s
-./build-images.sh
+./build-images.sh     # irondome-sensor, irondome-dashboard, irondome-training
+./kuber_start.sh      # namespace, archive key, sensor, policy, dashboard, port-forwards
 ```
 
-### Step 2: Start Kubernetes Deployment
+- Dashboard: http://localhost:8080
+- Sensor API: http://localhost:3001/health
+- Flow collector (UDP): `<node-ip>:30055`, e.g.
+  `python scripts/replay_capture.py captures/kill_chain.jsonl.gz --sensor 127.0.0.1:30055 --format ipfix`
+
+## Manifests
+
+| File | Contents |
+|---|---|
+| `namespace.yaml` | the `irondome` namespace |
+| `sensor-service.yaml` | sensor Deployment (1 pod, `IRONDOME_WORKERS=2` inside it), archive PVC, ClusterIP service (3001/tcp, 2055/udp), NodePort 30055/udp for external exporters |
+| `network-policy.yaml` | denies all egress from the sensor pod; a commented template allows one SIEM address inside the enclave |
+| `frontend.yaml` | dashboard Deployment ×2 and service |
+| `ingress.yaml` | optional single-host ingress (`irondome.local`): `/` → dashboard, `/api` + `/socket.io` → sensor |
+
+The sensor pod runs as UID 65534 with a read-only root filesystem, no capabilities, no
+service-account token and no privilege escalation. Its only writable paths are `/tmp`
+(emptyDir) and the archive volume.
+
+## Configuration
+
+Edit the `env` block in `sensor-service.yaml`:
+
+| Variable | Default here | Meaning |
+|---|---|---|
+| `IRONDOME_LAB` | `on` | built-in traffic lab; `off` for real exporters only |
+| `IRONDOME_LAB_JA3` | `on` | the lab's simulated JA3 list; set `off` on a real network (the public abuse.ch SSLBL list stays active) |
+| `IRONDOME_WORKERS` | `2` | detection worker processes (raise with the pod's CPU limit) |
+| `IRONDOME_INTERNAL_CIDRS` | RFC 1918 | the protected address space |
+| `IRONDOME_ARCHIVE_DIR` / `IRONDOME_ARCHIVE_KEY` | volume / Secret | signed archive; `deploy-k8s.sh` creates the key once |
+| `IRONDOME_SYSLOG` | unset | `udp://host:514` or `tcp://host:6514`, CEF or JSON (`IRONDOME_SYSLOG_FORMAT`) |
+| `IRONDOME_KAFKA` / `IRONDOME_KAFKA_TOPIC` | unset | Kafka brokers and topic (needs `kafka-python` in the image) |
+
+If you enable a SIEM output, also add its address to `network-policy.yaml`. It must be
+inside the enclave, never on the production side.
+
+## Operations
+
 ```bash
-cd k8s
-./kuber_start.sh
+./status.sh                         # deployments, pods, services, policies
+./logs.sh sensor-service 100        # sensor logs
+./restart.sh sensor-service         # rolling restart
+./scale.sh frontend 3               # the dashboard scales freely; the sensor scales with IRONDOME_WORKERS
+./stop.sh                           # scale to zero, stop port-forwards
+./cleanup.sh                        # delete the namespace (archive volume included)
 ```
-This deploys to K8s, installs dashboard, and starts port-forwards.
 
-### 1. Enable Kubernetes
-1. Open Docker Desktop
-2. Settings > Kubernetes > Enable Kubernetes
-3. Apply & Restart
-4. Verify: `kubectl cluster-info`
+Verify the archive from inside the pod (the key is already in the pod's environment):
 
-### 2. Build and Deploy
 ```bash
-# Build images
-./build-images.sh
-
-# Deploy to K8s
-./deploy-k8s.sh
-
-# Check status
-kubectl get pods
-kubectl get svc
+kubectl -n irondome exec deploy/sensor-service -- python /app/scripts/verify_archive.py /var/lib/irondome/archive
 ```
 
-### 3. Access Application
-- **Frontend**: http://localhost:8080
-- **API Gateway**: http://localhost:3001
-- **System App**: http://localhost:5001
-- **Dashboard**: https://localhost:8443 (token required)
+## Notes
 
-## Architecture
-
-### Services
-- **frontend**: React app (LoadBalancer, port 80)
-- **api-gateway**: FastAPI (ClusterIP, port 3001)
-- **ingest-service**: FastAPI (ClusterIP, port 8001)
-- **detection-engine**: FastAPI (ClusterIP, port 8002)
-- **alert-manager**: FastAPI (ClusterIP, port 8003)
-- **response-engine**: FastAPI (ClusterIP, port 8004)
-- **systemapp**: Flask monitoring app (ClusterIP, port 5050)
-
-### Load Balancing
-- Services use round-robin load balancing
-- Ingress routes HTTP traffic (/ → frontend, /api → api-gateway)
-- Each service scales to 2 replicas by default
-
-## Scaling
-
-### Manual Scaling
-```bash
-kubectl scale deployment <service-name> --replicas=<number>
-# Example: kubectl scale deployment api-gateway --replicas=5
-```
-
-### Auto-Scaling (HPA)
-```bash
-kubectl apply -f k8s/hpa.yaml  # Create HPA for CPU-based scaling
-```
-
-## Monitoring
-
-### Kubernetes Dashboard
-1. Install: Already done via deploy script
-2. Access: `kubectl port-forward -n kubernetes-dashboard svc/kubernetes-dashboard 8443:443`
-3. Login: Use token from `kubectl get secret dashboard-admin-token -n kubernetes-dashboard -o jsonpath="{.data.token}" | base64 --decode`
-
-### Logs
-```bash
-kubectl logs -f deployment/<service-name>
-```
-
-## Custom Load Balancing
-
-### Install NGINX Ingress (for advanced features)
-```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/cloud/deploy.yaml
-```
-
-### Update Ingress for Custom Rules
-Edit `k8s/ingress.yaml` with annotations:
-```yaml
-metadata:
-  annotations:
-    nginx.ingress.kubernetes.io/rate-limit: "100"
-    nginx.ingress.kubernetes.io/load-balance: "least_conn"
-```
-
-## Troubleshooting
-
-### Pods Not Starting
-```bash
-kubectl describe pod <pod-name>
-kubectl logs <pod-name>
-```
-
-### Images Not Pulling
-Ensure `imagePullPolicy: Never` in YAMLs for local images.
-
-### Dashboard Not Loading
-Restart port-forward and check token.
-
-## Production Deployment
-- Push images to Docker Hub: `docker tag <image> <username>/<image> && docker push`
-- Update YAMLs with registry URLs
-- Use cloud K8s (EKS, GKE) instead of Docker Desktop
-- Add persistent storage, secrets, and TLS
-
-## Utility Scripts
-
-### Scaling
-```bash
-./scale.sh <service-name> <replicas>
-# Example: ./scale.sh api-gateway 5
-```
-
-### Viewing Logs
-```bash
-./logs.sh <service-name> [lines]
-# Example: ./logs.sh api-gateway 50
-```
-
-### Checking Status
-```bash
-./status.sh
-```
-
-### Restarting Services
-```bash
-./restart.sh <service-name>
-# Example: ./restart.sh api-gateway
-```
-
-### Stopping Services
-```bash
-./stop.sh
-# Stops port-forwards and scales all deployments to 0
-```
-
-### Cleanup Everything
-```bash
-./cleanup.sh
-# Deletes all deployments, services, ingress, and dashboard
-```
-
-## Auto-Scaling (HPA)
-
-### Prerequisites
-Metrics Server must be installed (done automatically):
-```bash
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-```
-
-### Enable Auto-Scaling
-```bash
-./autoscale.sh enable
-# Enables HPA for api-gateway, ingest-service, detection-engine
-```
-
-### Check Auto-Scaling Status
-```bash
-./autoscale.sh status
-# Shows current replicas and scaling metrics
-```
-
-### Disable Auto-Scaling
-```bash
-./autoscale.sh disable
-# Removes all HPAs, back to manual scaling
-```
-
-### How It Works
-- **CPU Threshold**: Scales up when average CPU > 70%
-- **Memory Threshold**: Scales up when average memory > 80%
-- **Min/Max Replicas**: Prevents over/under scaling
-- **Cooldown**: 5-minute stabilization period
-
-### Custom HPA
-Edit `hpa.yaml` to adjust thresholds or add more services.
-
-## File Structure
-```
-k8s/
-├── KUBERNETES.md
-├── build-images.sh
-├── deploy-k8s.sh
-├── kuber_start.sh
-├── scale.sh
-├── logs.sh
-├── status.sh
-├── restart.sh
-├── stop.sh
-├── cleanup.sh
-├── autoscale.sh
-├── hpa.yaml
-├── alert-manager.yaml
-├── api-gateway.yaml
-├── detection-engine.yaml
-├── frontend.yaml
-├── ingest-service.yaml
-├── ingress.yaml
-├── model-microservice.yaml
-├── response-engine.yaml
-└── systemapp.yaml
-```
-
-For questions, check the main README.md or open an issue.
+- NetworkPolicy is enforced only by CNIs that implement it (Calico, Cilium, ...). Docker
+  Desktop's default network accepts the object but does not enforce it.
+- The sensor runs as one pod. More throughput comes from `IRONDOME_WORKERS` and more CPU,
+  not from more replicas, because the estate context lives in the pod's main process.

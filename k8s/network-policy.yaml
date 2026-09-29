@@ -15,3 +15,27 @@ spec:
   policyTypes:
     - Egress
   egress: []
+# ---------------------------------------------------------------------------
+# Optional: when IRONDOME_SYSLOG / IRONDOME_KAFKA forward alerts to a SIEM that sits
+# INSIDE the monitoring enclave, allow exactly that destination and nothing else.
+# Never point this at an address on the production side of the diode.
+#
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: sensor-to-siem
+#   namespace: irondome
+# spec:
+#   podSelector:
+#     matchLabels:
+#       app: sensor-service
+#   policyTypes:
+#     - Egress
+#   egress:
+#     - to:
+#         - ipBlock:
+#             cidr: 10.50.0.20/32      # the enclave SIEM
+#       ports:
+#         - protocol: UDP
+#           port: 514

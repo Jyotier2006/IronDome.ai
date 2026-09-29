@@ -1,0 +1,52 @@
+# IronDome.ai with Docker Compose
+#
+#   docker compose up --build
+#   dashboard http://localhost:8080 · sensor API http://localhost:3001/health · flow collector udp://localhost:2055
+#
+# Optional settings come from the environment or a .env file next to this one:
+#   IRONDOME_ARCHIVE_KEY=<long random secret>     enables the signed alert archive
+#   IRONDOME_SYSLOG=udp://siem.enclave:514        forwards incidents to a SIEM inside the enclave
+#   IRONDOME_WORKERS=2                            detection worker processes
+#   IRONDOME_LAB=off                              only external exporters / replays (real deployment)
+
+services:
+  sensor:
+    build:
+      context: .
+      dockerfile: backend/sensor-service/Dockerfile
+    image: irondome-sensor:latest
+    ports:
+      - "3001:3001"          # dashboard API + Socket.IO
+      - "2055:2055/udp"      # receive-only flow collector
+    environment:
+      IRONDOME_LAB: ${IRONDOME_LAB:-on}
+      IRONDOME_AUTO_SCENARIOS: ${IRONDOME_AUTO_SCENARIOS:-on}
+      IRONDOME_WORKERS: ${IRONDOME_WORKERS:-0}
+      IRONDOME_LAB_JA3: ${IRONDOME_LAB_JA3:-on}
+      IRONDOME_SYSLOG: ${IRONDOME_SYSLOG:-}
+      IRONDOME_SYSLOG_FORMAT: ${IRONDOME_SYSLOG_FORMAT:-cef}
+      IRONDOME_ARCHIVE_DIR: /var/lib/irondome/archive
+      IRONDOME_ARCHIVE_KEY: ${IRONDOME_ARCHIVE_KEY:-}
+    volumes:
+      - archive:/var/lib/irondome/archive
+    read_only: true            # the sensor writes nothing but the archive volume
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: frontend
+    image: irondome-dashboard:latest
+    ports:
+      - "8080:80"
+    depends_on:
+      - sensor
+    restart: unless-stopped
+
+volumes:
+  archive:

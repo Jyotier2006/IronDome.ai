@@ -28,7 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from irondome.export import UdpFlowExporter, public_record  # noqa: E402
+from irondome.export import FORMATS, UdpFlowExporter, public_record  # noqa: E402
 from irondome.lab import LAB_EPOCH, SCENARIOS, Lab, generate_capture  # noqa: E402
 
 
@@ -67,7 +67,7 @@ def cmd_capture(args):
 
 def cmd_stream(args):
     host, port = args.sensor.rsplit(":", 1)
-    ex = UdpFlowExporter(host, int(port))
+    ex = UdpFlowExporter(host, int(port), fmt=args.format)
     lab = Lab(seed=args.seed, scale=args.scale)
     rng = random.Random(args.seed)
     now = time.time()
@@ -92,7 +92,7 @@ def cmd_stream(args):
     schedule = sorted(zip(args.at or [], args.scenario or []), key=lambda x: x[0])
     start = time.time()
     next_auto = start + 30.0
-    print(f"streaming live flows one-way to udp://{host}:{port}  (Ctrl+C to stop)")
+    print(f"streaming live {args.format} flows one-way to udp://{host}:{port}  (Ctrl+C to stop)")
     try:
         while True:
             wall = time.time()
@@ -144,6 +144,8 @@ def main():
     s.add_argument("--at", action="append", type=float, help="seconds after start for the matching --scenario")
     s.add_argument("--auto", action="store_true", help="inject a random scenario every ~2 minutes")
     s.add_argument("--seed", type=int, default=None)
+    s.add_argument("--format", default="json", choices=FORMATS,
+                   help="json keeps DNS/TLS metadata; netflow5/netflow9/ipfix send flow counters only")
     s.set_defaults(fn=cmd_stream)
 
     args = ap.parse_args()

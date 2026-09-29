@@ -1,32 +1,10 @@
 #!/bin/bash
-
-set -e  # Exit on any error
-
-# Build Docker images for all services
+# Build the IronDome.ai images for a local cluster (Docker Desktop / kind / minikube).
+set -e
 cd "$(dirname "$0")/.."
 
-cd backend/ingest-service
-docker build -t ingest-service:latest .
+docker build -f backend/sensor-service/Dockerfile -t irondome-sensor:latest .
+docker build -t irondome-dashboard:latest ${VITE_SENSOR_URL:+--build-arg VITE_SENSOR_URL=$VITE_SENSOR_URL} frontend
+docker build -f model_microservice/Dockerfile -t irondome-training:latest .
 
-cd ../api-gateway
-docker build -t api-gateway:latest .
-
-cd ../detection-engine
-docker build -t detection-engine:latest .
-
-cd ../alert-manager
-docker build -t alert-manager:latest .
-
-cd ../response-engine
-docker build -t response-engine:latest .
-
-cd ../../frontend
-docker build -t frontend:latest .
-
-cd ../model_microservice
-docker build -t model-microservice:latest .
-
-cd ../systemapp
-docker build -t systemapp:latest .
-
-echo "All images built successfully."
+echo "Built irondome-sensor, irondome-dashboard and irondome-training."

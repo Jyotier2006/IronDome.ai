@@ -1,0 +1,17 @@
+# PS constraint (a): the monitoring enclave has no return path into production.
+# The sensor pod may RECEIVE flow exports and dashboard requests, but may not open any
+# connection of its own - all egress is denied (replies on accepted dashboard
+# connections are still delivered, as NetworkPolicy is stateful).
+# Enforced by CNIs that implement NetworkPolicy (Calico, Cilium, ...).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sensor-no-egress
+  namespace: irondome
+spec:
+  podSelector:
+    matchLabels:
+      app: sensor-service
+  policyTypes:
+    - Egress
+  egress: []

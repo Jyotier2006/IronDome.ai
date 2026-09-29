@@ -1,0 +1,10 @@
+.git
+**/node_modules
+**/venv
+**/.venv
+**/__pycache__
+frontend/dist
+frontend/dist-mock
+captures
+docs/images
+tests

@@ -1,15 +1,14 @@
 #!/bin/bash
+# Apply the IronDome.ai manifests (namespace "irondome").
+set -e
+cd "$(dirname "$0")"
 
-# Deploy to Kubernetes
+kubectl apply -f namespace.yaml
+kubectl apply -f sensor-service.yaml
+kubectl apply -f network-policy.yaml
+kubectl apply -f frontend.yaml
+if [ "$1" == "--ingress" ]; then
+  kubectl apply -f ingress.yaml
+fi
 
-kubectl apply --validate=false -f ingest-service.yaml
-kubectl apply --validate=false -f api-gateway.yaml
-kubectl apply --validate=false -f detection-engine.yaml
-kubectl apply --validate=false -f alert-manager.yaml
-kubectl apply --validate=false -f response-engine.yaml
-kubectl apply --validate=false -f frontend.yaml
-kubectl apply --validate=false -f model-microservice.yaml
-kubectl apply --validate=false -f systemapp.yaml
-kubectl apply --validate=false -f ingress.yaml
-
-echo "All services deployed to Kubernetes."
+echo "IronDome.ai deployed to namespace irondome."

@@ -2,6 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
+  namespace: irondome
+  labels:
+    app: frontend
 spec:
   replicas: 2
   selector:
@@ -12,21 +15,30 @@ spec:
       labels:
         app: frontend
     spec:
+      automountServiceAccountToken: false
       containers:
-      - name: frontend
-        image: frontend:latest
-        imagePullPolicy: Never
-        ports:
-        - containerPort: 80
+        - name: dashboard
+          image: irondome-dashboard:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend
+  namespace: irondome
 spec:
   selector:
     app: frontend
   ports:
-  - port: 80
-    targetPort: 80
-  type: LoadBalancer  # Or Ingress for external access
+    - port: 80
+      targetPort: 80
+  type: ClusterIP

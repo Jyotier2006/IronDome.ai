@@ -1,0 +1,109 @@
+# Passive sensor: receive-only flow collector (UDP 2055) + dashboard API / Socket.IO (3001).
+# One replica: detectors keep per-process streaming state (see docs/THROUGHPUT.md).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sensor-service
+  namespace: irondome
+  labels:
+    app: sensor-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sensor-service
+  template:
+    metadata:
+      labels:
+        app: sensor-service
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: sensor
+          image: irondome-sensor:latest
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 3001
+              protocol: TCP
+            - name: flows
+              containerPort: 2055
+              protocol: UDP
+          env:
+            - name: IRONDOME_LAB            # built-in simulated traffic source; "off" = only external exporters
+              value: "on"
+            - name: IRONDOME_AUTO_SCENARIOS
+              value: "on"
+            - name: IRONDOME_INTERNAL_CIDRS # the protected address space
+              value: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "1"
+              memory: 768Mi
+            limits:
+              cpu: "2"
+              memory: 1536Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sensor-service
+  namespace: irondome
+spec:
+  selector:
+    app: sensor-service
+  ports:
+    - name: http
+      port: 3001
+      targetPort: http
+      protocol: TCP
+    - name: flows
+      port: 2055
+      targetPort: flows
+      protocol: UDP
+  type: ClusterIP
+---
+# Flow exporters outside the cluster (probes, NetFlow routers, the diode's output side)
+# send to <node-ip>:30055/udp. kubectl port-forward cannot carry UDP, hence the NodePort.
+apiVersion: v1
+kind: Service
+metadata:
+  name: sensor-collector
+  namespace: irondome
+spec:
+  selector:
+    app: sensor-service
+  ports:
+    - name: flows
+      port: 2055
+      targetPort: flows
+      nodePort: 30055
+      protocol: UDP
+  type: NodePort

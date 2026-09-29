@@ -1,33 +1,13 @@
 #!/bin/bash
-
-# Scale Kubernetes deployments
-# Usage: ./scale.sh <service-name> <replicas>
-
+# Usage: ./scale.sh frontend <replicas>
+# The sensor stays at 1 replica: its detectors keep per-process streaming state, and
+# multi-sensor sharding is not implemented yet (see docs/THROUGHPUT.md).
 if [ $# -ne 2 ]; then
-    echo "Usage: $0 <service-name> <replicas>"
-    echo "Example: $0 api-gateway 5"
-    echo ""
-    echo "Available services:"
-    echo "  - frontend"
-    echo "  - api-gateway"
-    echo "  - ingest-service"
-    echo "  - detection-engine"
-    echo "  - alert-manager"
-    echo "  - response-engine"
-    echo "  - model-microservice"
-    echo "  - systemapp"
+    echo "Usage: $0 frontend <replicas>"
     exit 1
 fi
-
-SERVICE=$1
-REPLICAS=$2
-
-echo "📊 Scaling $SERVICE to $REPLICAS replicas..."
-kubectl scale deployment $SERVICE --replicas=$REPLICAS
-
-if [ $? -eq 0 ]; then
-    echo "✅ Scaled $SERVICE to $REPLICAS replicas"
-    kubectl get pods -l app=$SERVICE
-else
-    echo "❌ Failed to scale $SERVICE"
+if [ "$1" == "sensor-service" ] && [ "$2" != "0" ] && [ "$2" != "1" ]; then
+    echo "The sensor runs as a single replica (per-process streaming state)."
+    exit 1
 fi
+kubectl -n irondome scale deployment $1 --replicas=$2 && kubectl -n irondome get pods -l app=$1

@@ -1,32 +1,7 @@
 #!/bin/bash
-
-# Restart Kubernetes deployments
-# Usage: ./restart.sh <service-name>
-
+# Usage: ./restart.sh <sensor-service|frontend>
 if [ $# -ne 1 ]; then
-    echo "Usage: $0 <service-name>"
-    echo "Example: $0 api-gateway"
-    echo ""
-    echo "Available services:"
-    echo "  - frontend"
-    echo "  - api-gateway"
-    echo "  - ingest-service"
-    echo "  - detection-engine"
-    echo "  - alert-manager"
-    echo "  - response-engine"
-    echo "  - model-microservice"
-    echo "  - systemapp"
+    echo "Usage: $0 <sensor-service|frontend>"
     exit 1
 fi
-
-SERVICE=$1
-
-echo "🔄 Restarting $SERVICE..."
-kubectl rollout restart deployment $SERVICE
-
-if [ $? -eq 0 ]; then
-    echo "✅ Restarted $SERVICE"
-    kubectl get pods -l app=$SERVICE
-else
-    echo "❌ Failed to restart $SERVICE"
-fi
+kubectl -n irondome rollout restart deployment $1 && kubectl -n irondome get pods -l app=$1

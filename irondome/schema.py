@@ -328,7 +328,7 @@ ALERT_JSON_SCHEMA = {
             "required": ["name", "model", "mode"],
             "properties": {
                 "name": {"type": "string"}, "model": {"type": "string"}, "version": {"type": "string"},
-                "mode": {"enum": ["ml", "ml+intel", "intel", "heuristic-fallback"]},
+                "mode": {"enum": ["ml", "ml+intel", "ml+behaviour", "intel", "heuristic-fallback"]},
                 "threshold": {"type": "number"},
             },
         },

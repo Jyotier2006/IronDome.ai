@@ -1,0 +1,26 @@
+{
+  "description": "JA3 fingerprints of the traffic lab's simulated malware families. NOT real threat intelligence: it only matches lab traffic (disable with IRONDOME_LAB_JA3=off). Real fingerprints come from abuse.ch SSLBL in sslbl_ja3.csv.",
+  "generated_at": "2026-09-29T18:28:20+00:00",
+  "entries": [
+    {
+      "ja3": "47ad395473f3d93db904af2b983ca1b4",
+      "family": "mal_minimal",
+      "source": "traffic-lab"
+    },
+    {
+      "ja3": "bbafe4d3c06061974d8d828e0f7c492b",
+      "family": "mal_minimal",
+      "source": "traffic-lab"
+    },
+    {
+      "ja3": "c048339df1ff3446f5aca735364c1c05",
+      "family": "mal_legacy_ssl",
+      "source": "traffic-lab"
+    },
+    {
+      "ja3": "e19ed576935c9a898c80b07829d24589",
+      "family": "mal_legacy_ssl",
+      "source": "traffic-lab"
+    }
+  ]
+}

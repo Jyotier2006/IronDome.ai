@@ -108,8 +108,11 @@ class ThreatScorer:
     def __init__(self, models_dir: Path | None = None, load_intel: bool = True):
         self.models_dir = Path(models_dir) if models_dir else MODELS_DIR
         self.models: dict[str, _Loaded] = {}
-        self.ja3_watchlist: dict[str, str] = {}
-        self.stats = {"candidates": 0, "alerts": 0, "by_detector": {}, "by_class": {}}
+        self.ja3_watchlist: dict[str, str] = {}          # ja3 -> family / listing reason
+        self.ja3_source: dict[str, str] = {}             # ja3 -> list it came from
+        self.intel_sources: list[dict] = []
+        self.recent_scanners: dict[str, float] = {}      # source ip -> wall time last flagged
+        self.stats = {"candidates": 0, "alerts": 0, "by_detector": {}, "by_class": {}, "suppressed_scan_residue": 0}
         self._load_models()
         if load_intel:
             self._load_intel()
@@ -132,14 +135,61 @@ class ThreatScorer:
             self.models[det] = _Loaded(None, FEATURES[det], _fallback_classes(det), 0.5, "heuristic-fallback")
 
     def _load_intel(self):
+        """JA3 watchlists. `sslbl_ja3.csv` is abuse.ch's public SSL Blacklist JA3 feed (real
+        malware fingerprints); `lab_ja3_fingerprints.json` holds the traffic lab's simulated
+        malware families and only means something while the lab is the traffic source - set
+        IRONDOME_LAB_JA3=off on a real network. Every hit records which list matched."""
+        import csv
         import json
-        path = INTEL_DIR / "ja3_watchlist.json"
-        if path.exists():
+        import os
+        sslbl = INTEL_DIR / "sslbl_ja3.csv"
+        if sslbl.exists():
+            n = 0
+            with open(sslbl, encoding="utf-8") as f:
+                for row in csv.reader(line for line in f if line.strip() and not line.startswith("#")):
+                    if len(row) >= 4 and len(row[0]) == 32:
+                        self.ja3_watchlist[row[0]] = row[3].strip() or "malware"
+                        self.ja3_source[row[0]] = "abuse.ch SSLBL"
+                        n += 1
+            self.intel_sources.append({"name": "abuse.ch SSLBL JA3 fingerprints", "file": sslbl.name, "entries": n})
+        lab = INTEL_DIR / "lab_ja3_fingerprints.json"
+        if lab.exists() and os.environ.get("IRONDOME_LAB_JA3", "on").lower() not in ("off", "0", "false", "no"):
             try:
-                doc = json.loads(path.read_text(encoding="utf-8"))
-                self.ja3_watchlist = {e["ja3"]: e.get("family", "watchlist") for e in doc.get("entries", [])}
-            except Exception:
+                doc = json.loads(lab.read_text(encoding="utf-8"))
+                entries = doc.get("entries", [])
+                for e in entries:
+                    self.ja3_watchlist.setdefault(e["ja3"], e.get("family", "lab family"))
+                    self.ja3_source.setdefault(e["ja3"], "traffic-lab fingerprints")
+                self.intel_sources.append({"name": "traffic-lab simulated malware fingerprints", "file": lab.name,
+                                           "entries": len(entries)})
+            except (ValueError, KeyError):
                 pass
+
+    # ----- scan residue ---------------------------------------------------
+    DGA_NX_MIN = 8                  # distinct failed names from one host in 60 s
+    SCANNER_MEMORY_S = 300.0
+    SCAN_RESIDUE_MAX_RATE = 500.0   # half-open flows/s from one source; above this it is a flood
+
+    def note_scanner(self, ip: str, wall: float | None = None):
+        self.recent_scanners[ip] = wall if wall is not None else time.time()
+        if len(self.recent_scanners) > 5000:
+            cutoff = time.time() - self.SCANNER_MEMORY_S
+            self.recent_scanners = {k: v for k, v in self.recent_scanners.items() if v >= cutoff}
+
+    def is_recent_scanner(self, ip: str) -> bool:
+        t = self.recent_scanners.get(ip)
+        return t is not None and time.time() - t <= self.SCANNER_MEMORY_S
+
+    def scan_residue(self, cand: dict) -> bool:
+        """True when a SYN-flood window is really a port scan seen from the target's side:
+        one source sends most of the half-open connections, at scan-like rates, while
+        fanning out over many ports or already flagged as a scanner. A genuine flood (many
+        sources, or one source hammering a port at flood rates) is never suppressed."""
+        h = (cand.get("context") or {}).get("half_open_top_source")
+        if not h or h["per_s"] > self.SCAN_RESIDUE_MAX_RATE:
+            return False
+        known = self.is_recent_scanner(h["ip"])
+        return (h["share"] >= 0.6 and (h["distinct_ports"] >= 10 or known)) or (known and h["share"] >= 0.5)
 
     # ----- batch scoring (fast path) --------------------------------------
     def score_many(self, cands: list, source: dict | None = None) -> list:
@@ -166,7 +216,8 @@ class ThreatScorer:
                     alerts.append(a)
             else:
                 groups.setdefault(c["detector"], []).append(c)
-        for det, items in groups.items():
+        for det in sorted(groups, key=lambda d: 0 if d == "recon_scan" else 1):   # learn scanners first
+            items = groups[det]
             m = self.models[det]
             if m.model is None:
                 for c in items:
@@ -181,14 +232,37 @@ class ThreatScorer:
                 p_attack, tech_label = _decide(det, c["features"], probs[i], m.classes)
                 a = self._maybe_alert(det, c, c["features"], p_attack, _map_technique(det, tech_label), source)
                 if det == "encrypted_malware":
-                    ja3 = (c.get("context") or {}).get("ja3")
-                    if ja3 and ja3 in self.ja3_watchlist and (a is None or a["confidence"] < 0.9):
-                        a = self._build_alert(det, c, c["features"], 0.97, "ja3_watchlist", source,
-                                              extra_evidence={"ja3_watchlist_family": self.ja3_watchlist[ja3],
-                                                              "intel_source": "ja3_watchlist"}, detector_mode="ml+intel")
+                    a = self._apply_watchlist(c, a, source)
+                a = self._post(det, c, a)
                 if a:
                     alerts.append(a)
         return alerts
+
+    def _apply_watchlist(self, cand, alert, source):
+        ja3 = (cand.get("context") or {}).get("ja3")
+        if ja3 and ja3 in self.ja3_watchlist and (alert is None or alert["confidence"] < 0.9):
+            src = self.ja3_source.get(ja3, "watchlist")
+            conf = 0.9 if src == "abuse.ch SSLBL" else 0.97
+            alert = self._build_alert("encrypted_malware", cand, cand["features"], conf, "ja3_watchlist", source,
+                                      extra_evidence={"ja3_watchlist_family": self.ja3_watchlist[ja3],
+                                                      "intel_source": src}, detector_mode="ml+intel")
+        return alert
+
+    def _post(self, det, cand, alert):
+        """Cross-detector rules applied to a finished alert."""
+        if alert is None:
+            return None
+        if det == "recon_scan":
+            ip = (alert.get("entity") or {}).get("ip")
+            if ip:
+                self.note_scanner(ip)
+        elif det == "ddos" and alert.get("technique") == "syn_flood" and self.scan_residue(cand):
+            self.stats["suppressed_scan_residue"] += 1
+            self.stats["alerts"] -= 1
+            self.stats["by_detector"]["ddos"] -= 1
+            self.stats["by_class"]["volumetric_ddos"] -= 1
+            return None
+        return alert
 
     # ----- scoring --------------------------------------------------------
     def _predict(self, det: str, feats: dict):
@@ -215,15 +289,10 @@ class ThreatScorer:
         tech = _map_technique(det, tech_label)
         alert = self._maybe_alert(det, cand, feats, p_attack, tech, source)
 
-        # encrypted-malware: JA3 watchlist overrides a low model score
+        # encrypted-malware: a JA3 watchlist hit overrides a low model score
         if det == "encrypted_malware" and self.models[det].mode != "heuristic-fallback":
-            ja3 = (cand.get("context") or {}).get("ja3")
-            if ja3 and ja3 in self.ja3_watchlist and (alert is None or alert["confidence"] < 0.9):
-                alert = self._build_alert(det, cand, feats, 0.97, "ja3_watchlist", source,
-                                          extra_evidence={"ja3_watchlist_family": self.ja3_watchlist[ja3],
-                                                          "intel_source": "ja3_watchlist"},
-                                          detector_mode="ml+intel")
-        return alert
+            alert = self._apply_watchlist(cand, alert, source)
+        return self._post(det, cand, alert)
 
     def _score_dga(self, cand: dict, source):
         """DGA detector aggregates per-domain lexical scores over a host's suspicious domains."""
@@ -234,17 +303,32 @@ class ThreatScorer:
             p, _, _ = self._predict("dga_domain", f)
             scored.append((p, it))
         malicious = [(p, it) for p, it in scored if p >= self.models["dga_domain"].threshold]
-        if len(malicious) < 3:
-            return None
-        malicious.sort(key=lambda pi: -pi[0])
-        conf = float(sum(p for p, _ in malicious) / len(malicious))
-        conf = min(0.99, conf + 0.05 * math.log2(len(malicious)))
         feats = dict(cand["features"])
-        feats["malicious_domains"] = len(malicious)
-        top = [{"domain": it["domain"], "score": round(p, 3), "rcode": it.get("rcode")} for p, it in malicious[:8]]
-        return self._build_alert("dga_domain", cand, feats, conf, "dga", source,
-                                 extra_evidence={"malicious_domain_count": len(malicious), "example_domains": top,
-                                                 "nx_ratio": round(cand["context"].get("nx_ratio", 0.0), 3)})
+        nx_ratio = cand["context"].get("nx_ratio", 0.0)
+        if len(malicious) >= 3:
+            malicious.sort(key=lambda pi: -pi[0])
+            conf = float(sum(p for p, _ in malicious) / len(malicious))
+            conf = min(0.99, conf + 0.05 * math.log2(len(malicious)))
+            feats["malicious_domains"] = len(malicious)
+            top = [{"domain": it["domain"], "score": round(p, 3), "rcode": it.get("rcode")} for p, it in malicious[:8]]
+            return self._build_alert("dga_domain", cand, feats, conf, "dga", source,
+                                     extra_evidence={"malicious_domain_count": len(malicious), "example_domains": top,
+                                                     "nx_ratio": round(nx_ratio, 3), "basis": "lexical"})
+        # Behavioural path: dictionary-word DGAs look like ordinary names one at a time, but
+        # an infected host walks many never-registered names, so most lookups fail.
+        nx_items = sorted(((p, it) for p, it in scored if it.get("rcode") == "NXDOMAIN"), key=lambda pi: -pi[0])
+        if len(nx_items) >= self.DGA_NX_MIN and nx_ratio >= 0.5:
+            lex = sum(p for p, _ in nx_items[:8]) / 8
+            if lex >= 0.1:
+                conf = round(min(0.95, 0.55 + 0.3 * nx_ratio + 0.1 * lex), 4)
+                feats["nx_domains"] = len(nx_items)
+                top = [{"domain": it["domain"], "score": round(p, 3), "rcode": "NXDOMAIN"} for p, it in nx_items[:8]]
+                return self._build_alert("dga_domain", cand, feats, conf, "dga", source,
+                                         extra_evidence={"nxdomain_distinct_names": len(nx_items), "example_domains": top,
+                                                         "nx_ratio": round(nx_ratio, 3), "mean_lexical_score": round(lex, 3),
+                                                         "basis": "nxdomain behaviour"},
+                                         detector_mode="ml+behaviour")
+        return None
 
     def _maybe_alert(self, det, cand, feats, p_attack, tech, source):
         if p_attack < self.models[det].threshold:
@@ -370,7 +454,14 @@ _SUPPORT = {
         "udp_icmp_flood": lambda f: f["udp_ratio"] + f["icmp_ratio"] >= 0.5,
         "udp_amplification": lambda f: f["udp_ratio"] >= 0.5 and f["amp_port_ratio"] >= 0.3,
         "spoofed_flood": lambda f: f["src_entropy_norm"] >= 0.8 and f["flows_per_src"] <= 2.0 and f["uniq_src"] >= 50,
-        "slow_http": lambda f: f["tcp_ratio"] >= 0.5 and f["slow_ratio"] >= 0.2,
+        # Slowloris holds many slow connections per attacking host; one idle keep-alive
+        # connection from each of many browsers is ordinary web traffic
+        "slow_http": lambda f: f["tcp_ratio"] >= 0.5 and f["slow_ratio"] >= 0.2 and f["flows_per_src"] >= 1.5,
+    },
+    "c2_beacon": {
+        # implants sleep seconds to minutes between check-ins; sub-second repeats are a
+        # burst (e.g. a browser opening parallel connections), not a beacon
+        "beacon": lambda f: f["iat_median"] >= 1.0,
     },
     "recon_scan": {
         # scan probes are header-only / tiny; a flood spraying random ports carries payload

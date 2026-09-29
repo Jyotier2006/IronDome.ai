@@ -73,7 +73,7 @@ FEATURES: dict[str, list[str]] = {
     "dga_domain": [
         "length", "entropy", "digit_ratio", "vowel_ratio", "consonant_max_run", "digit_max_run",
         "unique_char_ratio", "hex_ratio", "bigram_score", "dict_coverage", "hyphen_count",
-        "tld_rarity", "n_labels", "sub_length",
+        "tld_rarity",
     ],
     "dns_tunnel": [
         "queries", "query_rate", "unique_ratio", "mean_qname_len", "max_qname_len", "mean_sub_len",
@@ -159,9 +159,7 @@ FEATURE_DOCS: dict[str, str] = {
     "bigram_score": "Mean log10 character-bigram probability under an English/benign-domain model",
     "dict_coverage": "Share of the label covered by dictionary words",
     "hyphen_count": "Number of hyphens",
-    "tld_rarity": "0 popular TLD, 1 other, 2 frequently abused TLD",
-    "n_labels": "Number of labels in the full query name",
-    "sub_length": "Length of the subdomain part",
+    "tld_rarity": "How unusual the domain suffix is: -log10 of its share among real popular domains (0 common .. 5 unseen)",
     # dns_tunnel
     "queries": "DNS queries to the base domain in 60 s",
     "query_rate": "Queries per second",
@@ -193,7 +191,7 @@ FEATURE_DOCS: dict[str, str] = {
     "tls13": "1 if TLS 1.3 was negotiated/offered", "sni_present": "1 if the ClientHello carried SNI",
     "sni_is_ip": "1 if SNI is an IP literal", "sni_entropy": "Character entropy of the SNI",
     "sni_len": "SNI length", "sni_digit_ratio": "Share of digits in the SNI",
-    "sni_tld_rarity": "TLD rarity of the SNI (0 popular .. 2 abused)",
+    "sni_tld_rarity": "Suffix rarity of the SNI (same scale as tld_rarity)",
     "alpn_present": "1 if ALPN was offered", "cipher_count": "Cipher suites offered",
     "ext_count": "TLS extensions offered",
     "ja3_prevalence": "Distinct internal hosts using this JA3 in the last hour",
@@ -349,7 +347,7 @@ class ContextStore:
 class _DstAgg:
     __slots__ = ("n", "pkts_f", "bytes_f", "pkts_b", "bytes_b", "src", "dports", "tcp", "udp", "icmp",
                  "syn_only", "established", "amp", "amp_ports", "unanswered", "dur_sum", "slow",
-                 "first", "last", "wall", "samples")
+                 "first", "last", "wall", "samples", "syn_src", "syn_ports")
 
     def __init__(self):
         self.n = self.pkts_f = self.bytes_f = self.pkts_b = self.bytes_b = 0
@@ -359,6 +357,8 @@ class _DstAgg:
         self.src: dict = {}
         self.dports: dict = {}
         self.amp_ports: dict = {}
+        self.syn_src: dict = {}      # half-open flows per source
+        self.syn_ports: dict = {}    # distinct ports probed by repeat half-open sources (capped)
         self.first = math.inf
         self.last = 0.0
         self.wall = 0.0
@@ -385,6 +385,13 @@ class _DstAgg:
             ff = r["flags_fwd"]
             if "S" in ff and "A" not in ff:
                 self.syn_only += 1
+                c = self.syn_src[s] = self.syn_src.get(s, 0) + 1
+                if c >= 3:                  # only repeat senders: spoofed floods stay cheap
+                    ports = self.syn_ports.get(s)
+                    if ports is None:
+                        ports = self.syn_ports[s] = set()
+                    if len(ports) < 64:
+                        ports.add(dp)
             elif "A" in ff and pb > 0:
                 self.established += 1
             if dur >= 5.0 and r["bytes_fwd"] / dur <= 200.0 and r["bytes_bwd"] <= 2000:
@@ -491,6 +498,13 @@ class DDoSExtractor:
             "top_dst_ports": [{"port": p, "flows": c} for p, c in top_ports],
             "amp_services": {AMP_SERVICES[p]: c for p, c in sorted(a.amp_ports.items(), key=lambda kv: -kv[1])[:3]},
         }
+        if a.syn_src:
+            # who sends the half-open connections, and how many ports that source probes:
+            # lets the scorer tell a port scan's residue from a genuine SYN flood
+            hs, hc = max(a.syn_src.items(), key=lambda kv: kv[1])
+            context["half_open_top_source"] = {"ip": hs, "share": round(hc / a.syn_only, 3),
+                                               "per_s": round(hc / self.WINDOW, 1),
+                                               "distinct_ports": len(a.syn_ports.get(hs, ()))}
         return _candidate("ddos", f"ddos|{dst}", {"type": "destination", "ip": dst}, feats, rep, a.samples,
                           a.first, a.last, a.wall, context)
 

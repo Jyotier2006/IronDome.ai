@@ -1,0 +1,17 @@
+{
+  "scenarios": [
+    {
+      "id": "308e68359ba0",
+      "scenario": "kill_chain",
+      "ps_ref": "b-f",
+      "threat_class": "multiple",
+      "start": 1758000330.0,
+      "end": 1758000520.0,
+      "attacker": "60.44.47.56",
+      "target": "10.10.1.49",
+      "host": "10.10.1.49"
+    }
+  ],
+  "lab_epoch": 1758000000.0,
+  "seed": 7
+}

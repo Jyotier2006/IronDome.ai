@@ -1,0 +1,39 @@
+{
+  "scenarios": [
+    {
+      "id": "0620affe689c",
+      "scenario": "port_scan",
+      "ps_ref": "e",
+      "threat_class": "recon_scan",
+      "start": 1758000020.0,
+      "end": 1758000050.0,
+      "attacker": "35.158.2.174",
+      "target": "10.10.2.80, 10.10.2.25, 10.10.2.10",
+      "host": "10.10.1.39"
+    },
+    {
+      "id": "afdd1d0fd038",
+      "scenario": "dns_tunnel",
+      "ps_ref": "c",
+      "threat_class": "dga_dns_tunnelling",
+      "start": 1758000055.0,
+      "end": 1758000115.0,
+      "attacker": "10.10.1.14",
+      "target": "t.pawogagikox.pw",
+      "host": "10.10.1.14"
+    },
+    {
+      "id": "427e4fab88fc",
+      "scenario": "encrypted_malware",
+      "ps_ref": "d",
+      "threat_class": "encrypted_malware",
+      "start": 1758000120.0,
+      "end": 1758000210.0,
+      "attacker": "168.50.115.74",
+      "target": "10.10.1.33",
+      "host": "10.10.1.33"
+    }
+  ],
+  "lab_epoch": 1758000000.0,
+  "seed": 11
+}

@@ -1,0 +1,74 @@
+{
+  "generated_at": "2026-09-29T15:33:35+00:00",
+  "host": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.2",
+    "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel"
+  },
+  "duration_s": 15.0,
+  "loss_budget": 0.005,
+  "latency_budget_ms": 3000,
+  "mean_flow_kb": 52.2,
+  "steps": [
+    {
+      "target_fps": 1000,
+      "sent": 14998,
+      "achieved_send_fps": 1000,
+      "received": 14998,
+      "processed_fps": 1000,
+      "loss": 0.0,
+      "monitored_mbps": 579.3,
+      "p50_ms": null,
+      "p95_ms": null,
+      "datagrams": 5630
+    },
+    {
+      "target_fps": 2500,
+      "sent": 37495,
+      "achieved_send_fps": 2500,
+      "received": 37495,
+      "processed_fps": 2500,
+      "loss": 0.0,
+      "monitored_mbps": 639.4,
+      "p50_ms": 1108.6,
+      "p95_ms": 1131.5,
+      "datagrams": 16621
+    },
+    {
+      "target_fps": 5000,
+      "sent": 74985,
+      "achieved_send_fps": 4999,
+      "received": 74985,
+      "processed_fps": 4999,
+      "loss": 0.0,
+      "monitored_mbps": 1076.2,
+      "p50_ms": 978.1,
+      "p95_ms": 2658.7,
+      "datagrams": 34902
+    },
+    {
+      "target_fps": 7500,
+      "sent": 112483,
+      "achieved_send_fps": 7499,
+      "received": 71674,
+      "processed_fps": 4778,
+      "loss": 0.3628,
+      "monitored_mbps": 4464.8,
+      "p50_ms": 1080.7,
+      "p95_ms": 3151.6,
+      "datagrams": 64667
+    }
+  ],
+  "sustained": {
+    "target_fps": 5000,
+    "sent": 74985,
+    "achieved_send_fps": 4999,
+    "received": 74985,
+    "processed_fps": 4999,
+    "loss": 0.0,
+    "monitored_mbps": 1076.2,
+    "p50_ms": 978.1,
+    "p95_ms": 2658.7,
+    "datagrams": 34902
+  }
+}

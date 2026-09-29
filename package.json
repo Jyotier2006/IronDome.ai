@@ -1,18 +1,18 @@
 {
-  "name": "threat-ops-ai",
-  "version": "1.0.0",
+  "name": "irondome-ai",
+  "version": "2.0.0",
   "private": true,
+  "description": "IronDome.ai - AI-based detection of cyber threats in unidirectional IP traffic (SIH PS 26145)",
   "scripts": {
     "postinstall": "cd frontend && npm install",
-    "dev:frontend": "cd frontend && set VITE_USE_MOCK=false&& npm run dev",
-    "dev:ingest": "cd backend/ingest-service && venv\\Scripts\\python.exe telemetry_ingestion_service.py",
-    "dev:gateway": "cd backend/api-gateway && venv\\Scripts\\python.exe socket_broadcast_gateway.py",
-    "dev:detection": "cd backend/detection-engine && venv\\Scripts\\python.exe anomaly_detection_orchestrator.py",
-    "dev:alert": "cd backend/alert-manager && venv\\Scripts\\python.exe incident_alert_dispatcher.py",
-    "dev:response": "cd backend/response-engine && venv\\Scripts\\python.exe automated_response_orchestrator.py",
-    "dev:model": "cd model_microservice && venv\\Scripts\\python.exe ml_inference_gateway.py",
-    "dev:backend": "npx concurrently -k -c \"blue,magenta,cyan,yellow,red,white\" -n \"INGEST,GATEWAY,DETECT,ALERT,RESP,MODEL\" \"npm run dev:ingest\" \"npm run dev:gateway\" \"npm run dev:detection\" \"npm run dev:alert\" \"npm run dev:response\" \"npm run dev:model\"",
-    "dev": "npx concurrently -k -c \"green,blue\" -n \"FRONT,BACK\" \"npm run dev:frontend\" \"npm run dev:backend\""
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:sensor": "cd backend/sensor-service && python sensor_service.py",
+    "dev": "npx concurrently -k -c \"green,cyan\" -n \"DASHBOARD,SENSOR\" \"npm run dev:frontend\" \"npm run dev:sensor\"",
+    "demo": "cd frontend && npm run dev:mock",
+    "train": "cd model_microservice && python model_training_pipeline.py",
+    "evaluate": "cd model_microservice && python evaluate_pipeline.py",
+    "test": "python -m unittest discover -s tests -v",
+    "build": "cd frontend && npm run build"
   },
   "devDependencies": {
     "concurrently": "^8.2.0"

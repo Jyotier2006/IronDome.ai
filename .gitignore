@@ -1,7 +1,9 @@
 # Dependencies
 node_modules/
 venv/
+.venv/
 __pycache__/
+*.pyc
 .pnp
 .pnp.js
 
@@ -11,10 +13,15 @@ __pycache__/
 # Testing
 coverage/
 
-# Production
+# Production builds
 build/
 dist/
+dist-mock/
 
+# Packet captures are large - regenerate them with scripts/traffic_lab.py capture --pcap
+# (the small JSONL flow captures in captures/ are committed)
+captures/*.pcap
+captures/*.pcapng
 
 # Misc
 .DS_Store
@@ -35,6 +42,3 @@ yarn-error.log*
 .vscode
 *.swp
 *.swo
-
-# Data
-backend/ingest-service/data/events.json

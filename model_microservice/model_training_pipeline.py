@@ -17,7 +17,7 @@ Methodology
   * model: HistGradientBoostingClassifier (class-balanced) wrapped in 3-fold isotonic
     calibration, so the reported confidence behaves like a probability
   * outputs: models/<detector>.joblib, models/model_card.json, docs/MODEL_REPORT.md,
-    backend/sensor-service/intel/ja3_watchlist.json
+    backend/sensor-service/intel/lab_ja3_fingerprints.json
 """
 
 from __future__ import annotations
@@ -65,14 +65,14 @@ from irondome.traffic import lab_ja3_watchlist  # noqa: E402
 
 MODELS_DIR = Path(__file__).resolve().parent / "models"
 REPORT_PATH = ROOT / "docs" / "MODEL_REPORT.md"
-INTEL_PATH = ROOT / "backend" / "sensor-service" / "intel" / "ja3_watchlist.json"
+INTEL_PATH = ROOT / "backend" / "sensor-service" / "intel" / "lab_ja3_fingerprints.json"
 
 # training samples per class; validation / test = 30 % of that, stress = 20 %
 SIZES = {
     "ddos": 700,
     "recon_scan": 900,
     "c2_beacon": 2500,
-    "dga_domain": 6000,
+    "dga_domain": 10000,
     "dns_tunnel": 1500,
     "encrypted_malware": 3000,
     "exfiltration": 2000,
@@ -91,8 +91,8 @@ TITLES = {
 
 
 def _chunk(args):
-    detector, label, n, seed, shift = args
-    return label, *generate(detector, label, n, seed, shift)
+    detector, label, n, seed, shift, split = args
+    return label, *generate(detector, label, n, seed, shift, split=split)
 
 
 BENIGN_FACTOR = 3   # extra benign samples in held-out splits so false-positive rates are measurable
@@ -110,7 +110,7 @@ def build_split(pool, detector, split, per_class, workers):
         while done < n:
             m = min(step, n - done)
             seed = int(hashlib.sha1(f"{detector}|{label}|{split}|{seed_base}|{k}".encode()).hexdigest()[:8], 16)
-            chunks.append((detector, label, m, seed, shift))
+            chunks.append((detector, label, m, seed, shift, split))
             done += m
             k += 1
     X, y, metas = [], [], []
@@ -283,6 +283,8 @@ def train_detector(pool, detector, per_class, workers):
         "importance": importances(model, Xv, yv, names, threshold),
         "inference_us_per_row": inference_speed(model, Xv),
     }
+    if detector == "dga_domain":
+        card["real_world"] = real_world_dga(model, threshold, names)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     path = MODELS_DIR / f"{detector}.joblib"
     joblib.dump({"model": model, "detector": detector, "features": names, "classes": classes,
@@ -295,6 +297,60 @@ def train_detector(pool, detector, per_class, workers):
           f"FPR={te['false_positive_rate']} AUC={te['roc_auc']} | stress R={st['recall']} FPR={st['false_positive_rate']}",
           flush=True)
     return card
+
+
+def real_world_dga(model, threshold, names):
+    """False-positive rates of the DGA model on real popular domains it never trained on:
+    the held-out Tranco test partition, and the OpenDNS top list (all of it, and only the
+    domains outside the training partition)."""
+    from irondome.domains import OPENDNS, TRANCO, domain_split, list_header, read_list, real_benign
+    from irondome.features import dga_prefilter
+    from irondome.lexical import domain_features
+
+    def rates(domains):
+        if not domains:
+            return None
+        feats = [domain_features(d) for d in domains]
+        p = model.predict_proba(np.array([[float(f[k]) for k in names] for f in feats]))[:, 1]
+        flagged = p >= threshold
+        piped = [bool(fl and dga_prefilter(f, "NOERROR")) for fl, f in zip(flagged, feats)]
+        top = [domains[i] for i in np.argsort(-p)[:10] if flagged[i]]
+        return {"domains": len(domains), "model_fpr": round(float(flagged.mean()), 4),
+                "pipeline_fpr": round(sum(piped) / len(piped), 4), "top_false_positives": top}
+
+    out = {}
+    if TRANCO.exists():
+        out["tranco_test"] = {"list": list_header(TRANCO), **(rates(list(real_benign("test"))) or {})}
+    if OPENDNS.exists():
+        odns = sorted(set(read_list(OPENDNS)))
+        out["opendns_all"] = {"list": list_header(OPENDNS), **(rates(odns) or {})}
+        out["opendns_not_in_training"] = {"list": list_header(OPENDNS),
+                                          **(rates([d for d in odns if domain_split(d) != "train"]) or {})}
+    for k, v in out.items():
+        if "model_fpr" in v:
+            print(f"  real-world {k}: {v['domains']} domains, false positives model {100 * v['model_fpr']:.2f}% "
+                  f"pipeline {100 * v['pipeline_fpr']:.2f}%", flush=True)
+    return out
+
+
+def build_lexical(use_real: bool):
+    """Build irondome/lexical_model.json from the Tranco *training* partition (before any
+    worker starts, so every process computes features with the same tables)."""
+    from irondome import lexical
+    from irondome.domains import TRANCO, list_header, real_benign
+    if not use_real:
+        return lexical.LEXICAL_MODEL
+    train = list(real_benign("train"))
+    if not train:
+        print("  no data/tranco_top.txt - keeping the existing lexical model "
+              "(python scripts/fetch_domain_lists.py to use real domains)", flush=True)
+        return lexical.LEXICAL_MODEL
+    doc = lexical.build_lexical_model(train, source=f"{list_header(TRANCO)} - training partition")
+    lexical.LEXICAL_MODEL_PATH.write_text(json.dumps(doc, separators=(",", ":")) + "\n", encoding="utf-8")
+    info = lexical._load_lexical_model()
+    print(f"  lexical model: {doc['corpus_domains']} real training domains, {len(doc['vocabulary'])} vocabulary "
+          f"tokens, {len(doc['tld_rarity'])} suffixes -> {lexical.LEXICAL_MODEL_PATH.name}", flush=True)
+    return info
 
 
 # ---------------------------------------------------------------------------
@@ -314,8 +370,10 @@ def write_report(cards, meta):
     L.append("")
     L.append("Every number below comes from data the model never saw during training. **Test** has the same "
              "distribution as training; **Stress** is deliberately shifted (weaker, slower or stealthier attacks and "
-             "harder benign look-alikes) to show how the models degrade. All data is synthetic lab traffic, so real "
-             "deployments should re-validate on captures from their own network (methodology: the *ML pipeline* section of `README.md`).")
+             "harder benign look-alikes) to show how the models degrade. Benign domains for the DGA model come from "
+             "the real Tranco top-sites list (held-out partitions for validation and test); everything else is "
+             "synthetic lab traffic, so deployments should re-validate on captures from their own network "
+             "(`model_microservice/recalibrate.py`; methodology: the *ML pipeline* section of `README.md`).")
     L.append("")
     L.append("| PS | Detector | Test precision | Test recall | Test F1 | Test FPR | ROC-AUC | Stress recall | Stress FPR | Threshold | Inference |")
     L.append("|---|---|---|---|---|---|---|---|---|---|---|")
@@ -359,6 +417,19 @@ def write_report(cards, meta):
             key = "detection_rate" if metric == "detection rate" else "false_positive_rate"
             L.append(f"| {k} | {metric} | {_pct(tk[k][key]) if k in tk else '-'} | {_pct(sk[k][key]) if k in sk else '-'} |")
         L.append("")
+        if c.get("real_world"):
+            L.append("**Real-world check: popular benign domains the model never trained on**")
+            L.append("")
+            L.append("| List | Domains | Flagged by the model | Flagged after the sensor's pre-filter | Highest-scoring examples |")
+            L.append("|---|---|---|---|---|")
+            for k, v in c["real_world"].items():
+                if "model_fpr" in v:
+                    L.append(f"| {k.replace('_', ' ')} ({v['list']}) | {v['domains']:,} | {_pct(v['model_fpr'])} | "
+                             f"{_pct(v['pipeline_fpr'])} | {', '.join(v['top_false_positives'][:5]) or '-'} |")
+            L.append("")
+            L.append("A host alert additionally needs at least 3 flagged domains from the same host within 60 s. "
+                     "Recall on real DGA families is measured with `evaluate_domains.py --dga <list>`.")
+            L.append("")
         L.append("Most influential features (permutation importance on validation):")
         L.append("")
         L.append("| Feature | Importance | Meaning |")
@@ -375,10 +446,11 @@ def write_intel():
     INTEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     wl = lab_ja3_watchlist()
     doc = {
-        "description": "JA3 fingerprints of known C2 client families. Pre-populated with the traffic lab's "
-                       "'known' C2 families; extend with external threat-intel feeds (e.g. abuse.ch SSLBL).",
+        "description": "JA3 fingerprints of the traffic lab's simulated malware families. NOT real threat "
+                       "intelligence: it only matches lab traffic (disable with IRONDOME_LAB_JA3=off). Real "
+                       "fingerprints come from abuse.ch SSLBL in sslbl_ja3.csv.",
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "entries": [{"ja3": k, "family": v, "source": "irondome-lab"} for k, v in sorted(wl.items())],
+        "entries": [{"ja3": k, "family": v, "source": "traffic-lab"} for k, v in sorted(wl.items())],
     }
     INTEL_PATH.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
 
@@ -388,6 +460,8 @@ def main():
     ap.add_argument("--quick", action="store_true", help="small data sets (smoke test)")
     ap.add_argument("--only", default="", help="comma-separated detectors to (re)train")
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
+    ap.add_argument("--no-real-domains", action="store_true",
+                    help="do not use data/tranco_top.txt for the DGA model even if present")
     args = ap.parse_args()
 
     detectors = [d for d in SIZES if not args.only or d in args.only.split(",")]
@@ -400,6 +474,7 @@ def main():
           f"{args.workers} worker(s){' [quick]' if args.quick else ''}", flush=True)
     t_all = time.time()
     cards = dict(existing)
+    lexical_info = build_lexical(not args.no_real_domains and "dga_domain" in detectors)
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         for det in detectors:
             print(f"[{det}]", flush=True)
@@ -413,6 +488,7 @@ def main():
         "numpy": np.__version__,
         "python": platform.python_version(),
         "quick": args.quick,
+        "lexical_model": lexical_info,
         "total_seconds": round(time.time() - t_all, 1),
     }
     card_path.write_text(json.dumps({**meta, "detectors": cards}, indent=2) + "\n", encoding="utf-8")

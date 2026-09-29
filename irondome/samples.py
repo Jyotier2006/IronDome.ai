@@ -19,6 +19,7 @@ import math
 import random
 
 from . import traffic as T
+from .domains import real_benign
 from .features import FEATURES, DDoSExtractor, FeaturePipeline
 from .lexical import domain_features
 from .netutil import registered_domain
@@ -334,17 +335,22 @@ def _beacon_features(host, dst, dport, proto, recs, prevalence, kind):
 # ---------------------------------------------------------------------------
 # (c) DGA domains (per domain) and DNS tunnelling (per host + base domain)
 # ---------------------------------------------------------------------------
-def dga_sample(rng, label, shift=False):
+def dga_sample(rng, label, shift=False, split=None):
     if label == "dga":
-        family = rng.choice(["wordlist", "pronounceable"]) if shift else rng.choice(T.DGA_FAMILIES)
+        family = (rng.choice(["wordlist", "pronounceable", "cv_y", "syllables", "word_digits"]) if shift
+                  else rng.choice(T.DGA_FAMILIES))
         d = T.dga_domain(rng, family)
     else:
-        family = "benign"
+        # real popular domains (Tranco partition of this split) when downloaded, plus
+        # the lab's own names and CDN hostnames
+        real = real_benign(split) if split else ()
         r = rng.random()
-        if r < 0.1:
-            d = T.cdn_hostname(rng)
+        if real and r < 0.8:
+            family, d = "benign:top-sites", rng.choice(real)
+        elif r < 0.88:
+            family, d = "benign:cdn", T.cdn_hostname(rng)
         else:
-            d = T.benign_domain(rng, with_sub=False)
+            family, d = "benign:lab", T.benign_domain(rng, with_sub=False)
     return domain_features(registered_domain(d)), {"kind": family, "domain": d}
 
 
@@ -535,7 +541,8 @@ GENERATORS = {
 }
 
 
-def generate(detector: str, label: str, n: int, seed: int, shift: bool = False, max_tries: int = 6):
+def generate(detector: str, label: str, n: int, seed: int, shift: bool = False, max_tries: int = 6,
+             split: str | None = None):
     """n labelled rows for one (detector, label). Returns (rows, metas)."""
     rng = random.Random(seed)
     names = FEATURES[detector]
@@ -544,7 +551,7 @@ def generate(detector: str, label: str, n: int, seed: int, shift: bool = False, 
     tries = 0
     while len(rows) < n and tries < n * max_tries:
         tries += 1
-        out = gen(rng, label, shift)
+        out = gen(rng, label, shift, split) if detector == "dga_domain" else gen(rng, label, shift)
         if out is None:
             continue
         feats, meta = out

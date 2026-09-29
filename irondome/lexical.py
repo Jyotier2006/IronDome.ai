@@ -1,14 +1,20 @@
 """Lexical features of DNS query names (PS threat class c).
 
 The DGA detector scores the *second-level label* of each queried domain
-(e.g. "xkqzjwpt" in "xkqzjwpt.info") with character statistics and a character
-bigram language model trained on an embedded English word list and a corpus of
-popular benign domains. Nothing is downloaded at run time.
+(e.g. "xkqzjwpt" in "xkqzjwpt.info") with character statistics, a character bigram
+language model, dictionary coverage and how common the domain's suffix is.
+
+The bigram model, vocabulary and suffix frequencies come from lexical_model.json,
+which model_training_pipeline.py builds from the *training* partition of a real
+top-sites list (Tranco). Without that file the embedded word list is used. Nothing
+is downloaded at run time.
 """
 
 from __future__ import annotations
 
+import json
 import math
+from pathlib import Path
 
 from .netutil import split_domain, str_entropy
 
@@ -155,6 +161,10 @@ def _train_bigrams() -> dict[str, float]:
         _, sld, _ = split_domain(d)
         if sld:
             corpus.append(sld)
+    return _bigram_table(corpus)
+
+
+def _bigram_table(corpus) -> dict[str, float]:
     counts: dict[str, int] = {}
     firsts: dict[str, int] = {}
     symbols = "^" + _ALPHABET + "$"
@@ -174,6 +184,60 @@ def _train_bigrams() -> dict[str, float]:
 
 BIGRAM_LOGP = _train_bigrams()
 _BIGRAM_FLOOR = min(BIGRAM_LOGP.values())
+
+# ---------------------------------------------------------------------------
+# Lexical model learned from a real benign corpus (optional, see module doc)
+# ---------------------------------------------------------------------------
+LEXICAL_MODEL_PATH = Path(__file__).with_name("lexical_model.json")
+TLD_RARITY: dict[str, float] = {}   # suffix -> -log10(share of benign domains using it)
+_TLD_UNSEEN = 5.0
+# suffixes of the deployment's own country are ordinary there even if rare globally
+HOME_SUFFIXES = frozenset("in co.in gov.in ac.in org.in net.in nic.in edu.in res.in firm.in gen.in ind.in".split())
+
+
+def build_lexical_model(domains, source: str = "") -> dict:
+    """Bigram table, vocabulary and suffix rarity from a list of benign registered domains."""
+    slds, suffix_counts, token_counts = [], {}, {}
+    for d in domains:
+        _, sld, suffix = split_domain(d)
+        if not sld:
+            continue
+        slds.append(sld)
+        suffix_counts[suffix] = suffix_counts.get(suffix, 0) + 1
+        for tok in sld.split("-"):
+            if tok.isalpha() and 3 <= len(tok) <= 12:
+                token_counts[tok] = token_counts.get(tok, 0) + 1
+    vocab = ({t for t, c in token_counts.items() if c >= 2}
+             | {x for x in slds[:5000] if x.isalpha() and 4 <= len(x) <= 12})
+    total, v = sum(suffix_counts.values()), len(suffix_counts) + 1
+    rarity = {sfx: min(5.0, -math.log10((c + 1) / (total + v))) for sfx, c in suffix_counts.items()}
+    for sfx in HOME_SUFFIXES:
+        rarity[sfx] = min(rarity.get(sfx, 5.0), 1.0)
+    return {
+        "version": 1,
+        "source": source,
+        "corpus_domains": len(slds),
+        "bigram_logp": {k: round(val, 5) for k, val in _bigram_table(list(WORDS) + slds).items()},
+        "vocabulary": sorted(vocab),
+        "tld_rarity": {k: round(val, 4) for k, val in sorted(rarity.items())},
+        "tld_unseen": round(min(5.0, -math.log10(1 / (total + v))), 4),
+    }
+
+
+def _load_lexical_model():
+    global BIGRAM_LOGP, _BIGRAM_FLOOR, WORD_SET, _TLD_UNSEEN
+    if not LEXICAL_MODEL_PATH.exists():
+        return None
+    doc = json.loads(LEXICAL_MODEL_PATH.read_text(encoding="utf-8"))
+    BIGRAM_LOGP = doc["bigram_logp"]
+    _BIGRAM_FLOOR = min(BIGRAM_LOGP.values())
+    WORD_SET = frozenset(WORDS) | frozenset(doc["vocabulary"])
+    TLD_RARITY.update(doc["tld_rarity"])
+    _TLD_UNSEEN = doc["tld_unseen"]
+    return {k: doc[k] for k in ("version", "source", "corpus_domains")}
+
+
+LEXICAL_MODEL = _load_lexical_model()
 
 
 def bigram_score(label: str) -> float:
@@ -213,7 +277,11 @@ def _max_run(label: str, predicate) -> int:
     return best
 
 
-def tld_rarity(suffix: str) -> int:
+def tld_rarity(suffix: str) -> float:
+    """How unusual the domain's public suffix is among benign domains (0 = very common).
+    Learned from the real corpus when lexical_model.json exists, else a coarse 0/1/2 scale."""
+    if TLD_RARITY:
+        return TLD_RARITY.get(suffix, TLD_RARITY.get(suffix.rsplit(".", 1)[-1], _TLD_UNSEEN))
     tld = suffix.rsplit(".", 1)[-1] if suffix else ""
     if tld in POPULAR_TLDS:
         return 0
@@ -225,7 +293,7 @@ def tld_rarity(suffix: str) -> int:
 DOMAIN_FEATURES = [
     "length", "entropy", "digit_ratio", "vowel_ratio", "consonant_max_run", "digit_max_run",
     "unique_char_ratio", "hex_ratio", "bigram_score", "dict_coverage", "hyphen_count",
-    "tld_rarity", "n_labels", "sub_length",
+    "tld_rarity",
 ]
 
 

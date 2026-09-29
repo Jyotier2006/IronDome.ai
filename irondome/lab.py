@@ -179,7 +179,7 @@ class Lab:
                                  sni=T.dga_domain(rng, "pronounceable"), start=now, end=end))
             target = host
         elif scenario == "dga":
-            pats.append(T.DgaBurst(rng, host, net.resolver, family=rng.choice(["random_alpha", "alnum", "hex"]),
+            pats.append(T.DgaBurst(rng, host, net.resolver, family=rng.choice(T.DGA_FAMILIES),
                                    rate=2.5 * k, nx_ratio=0.95, start=now, end=end))
             attacker, target = host, net.resolver
         elif scenario == "dns_tunnel":

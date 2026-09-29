@@ -446,7 +446,16 @@ def cdn_hostname(rng) -> str:
     return "".join(rng.choice("0123456789abcdef") for _ in range(rng.randint(10, 16))) + "." + provider
 
 
-DGA_FAMILIES = ["random_alpha", "alnum", "hex", "pronounceable", "wordlist"]
+# Generic shapes of algorithmically generated names (no specific malware algorithm is
+# reproduced): random letters / alphanumerics / hex, consonant-vowel patterns (including
+# "y" as a vowel), syllable chains, dictionary-word chains, word + number, and random
+# labels hidden under dynamic-DNS providers.
+DGA_FAMILIES = ["random_alpha", "alnum", "hex", "pronounceable", "wordlist", "cv_y", "syllables",
+                "word_digits", "dyndns"]
+_SYLLABLES = ("ka ko ri mi lo na ve tor dan mar sel vin bro gel pur zan fex lum qua ris "
+              "tev hol dro nim sap wel cor ben tas gul fim pax yor".split())
+_DYNDNS = ["ddns.net", "hopto.org", "zapto.org", "duckdns.org", "no-ip.org", "sytes.net", "dynu.net",
+           "servehttp.com", "myftp.biz", "3utilities.com"]
 
 
 def dga_domain(rng, family: str) -> str:
@@ -461,7 +470,23 @@ def dga_domain(rng, family: str) -> str:
         label = "".join(rng.choice(cons) + rng.choice(vows) for _ in range(rng.randint(4, 8)))
         if rng.random() < 0.5:
             label += rng.choice(cons)
-    else:  # wordlist (e.g. Suppobox / Matsnu style)
+    elif family == "cv_y":
+        cons, vows = "bcdfghjklmnpqrstvwxz", "aeiouy"
+        label = "".join(rng.choice(cons) + rng.choice(vows) for _ in range(rng.randint(3, 6)))
+        if rng.random() < 0.6:
+            label += rng.choice(cons)
+    elif family == "syllables":
+        label = "".join(rng.choice(_SYLLABLES) for _ in range(rng.randint(3, 5)))
+        if rng.random() < 0.3:
+            label += str(rng.randint(1, 99))
+    elif family == "word_digits":
+        label = rng.choice(WORDS) + str(rng.randint(100, 99999))
+    elif family == "dyndns":
+        n = rng.randint(8, 18)
+        label = "".join(rng.choice(string.ascii_lowercase + (string.digits if rng.random() < 0.5 else ""))
+                        for _ in range(n))
+        return f"{label}.{rng.choice(_DYNDNS)}"
+    else:  # wordlist: two or three dictionary words
         label = "".join(rng.choice(WORDS) for _ in range(rng.randint(2, 3)))
     return f"{label}.{rng.choice(_TLDS_DGA)}"
 

@@ -42,3 +42,6 @@ yarn-error.log*
 .vscode
 *.swp
 *.swo
+
+# Downloaded domain lists (scripts/fetch_domain_lists.py)
+data/

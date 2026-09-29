@@ -143,6 +143,20 @@ MULTI_PART_SUFFIXES = {
     "com.hk", "com.tw", "co.kr", "com.pk", "com.bd", "com.np", "com.lk",
 }
 
+# Dynamic-DNS and free-subdomain providers (the "private" part of the Public Suffix
+# List). Malware often hides generated names under them (xkqz.ddns.net), so the name
+# that matters is the label in front of the provider, not the provider itself.
+DYNAMIC_DNS_SUFFIXES = {
+    "ddns.net", "hopto.org", "zapto.org", "sytes.net", "no-ip.org", "no-ip.biz", "no-ip.info", "noip.me",
+    "myftp.org", "myftp.biz", "servebeer.com", "serveftp.com", "servehttp.com", "servegame.com",
+    "servequake.com", "redirectme.net", "bounceme.net", "myvnc.com", "onthewifi.com", "ddns.me",
+    "duckdns.org", "dyndns.org", "dyndns.info", "dynu.net", "dynu.com", "freedynamicdns.net", "ydns.eu",
+    "dnsalias.com", "dnsalias.net", "dnsalias.org", "homeip.net", "homelinux.com", "gotdns.ch",
+    "3utilities.com", "publicvm.com", "linkpc.net", "mooo.com", "chickenkiller.com", "strangled.net",
+    "dynv6.net", "dns.army", "freeddns.org", "mywire.org", "webhop.me",
+}
+MULTI_PART_SUFFIXES |= DYNAMIC_DNS_SUFFIXES
+
 
 def split_domain(qname: str) -> tuple[str, str, str]:
     """Split a query name into (subdomain, second-level label, public suffix).

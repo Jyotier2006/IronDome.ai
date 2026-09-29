@@ -1,0 +1,201 @@
+{
+  "generated_at": "2026-09-29T15:40:46+00:00",
+  "repeats": 3,
+  "detector_modes": {
+    "ddos": "ml",
+    "c2_beacon": "ml",
+    "dga_domain": "ml",
+    "dns_tunnel": "ml",
+    "encrypted_malware": "ml",
+    "recon_scan": "ml",
+    "exfiltration": "ml"
+  },
+  "seconds": 332.6,
+  "scenarios": [
+    {
+      "scenario": "syn_flood",
+      "ps_ref": "a",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 2.0,
+      "fps": 0.3,
+      "off_classes": {
+        "encrypted_malware": 1
+      },
+      "flows_per_s": 12214,
+      "schema_errors": 0
+    },
+    {
+      "scenario": "spoofed_flood",
+      "ps_ref": "a",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 2.0,
+      "fps": 0.3,
+      "off_classes": {
+        "encrypted_malware": 1
+      },
+      "flows_per_s": 10402,
+      "schema_errors": 0
+    },
+    {
+      "scenario": "udp_flood",
+      "ps_ref": "a",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 2.0,
+      "fps": 0.3,
+      "off_classes": {
+        "encrypted_malware": 1
+      },
+      "flows_per_s": 10128,
+      "schema_errors": 0
+    },
+    {
+      "scenario": "udp_amplification",
+      "ps_ref": "a",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 2.0,
+      "fps": 0.3,
+      "off_classes": {
+        "encrypted_malware": 1
+      },
+      "flows_per_s": 8475,
+      "schema_errors": 0
+    },
+    {
+      "scenario": "slowloris",
+      "ps_ref": "a",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 12.0,
+      "fps": 0.3,
+      "off_classes": {
+        "encrypted_malware": 1
+      },
+      "flows_per_s": 5913,
+      "schema_errors": 0
+    },
+    {
+      "scenario": "port_scan",
+      "ps_ref": "e",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 1.1,
+      "fps": 0.3,
+      "off_classes": {
+        "encrypted_malware": 1
+      },
+      "flows_per_s": 5588,
+      "schema_errors": 0
+    },
+    {
+      "scenario": "host_sweep",
+      "ps_ref": "e",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 1.4,
+      "fps": 1.7,
+      "off_classes": {
+        "recon_scan": 3,
+        "volumetric_ddos": 1,
+        "encrypted_malware": 1
+      },
+      "flows_per_s": 5530,
+      "schema_errors": 0
+    },
+    {
+      "scenario": "c2_beacon",
+      "ps_ref": "b",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 36.0,
+      "fps": 0.3,
+      "off_classes": {
+        "encrypted_malware": 1
+      },
+      "flows_per_s": 4754,
+      "schema_errors": 0
+    },
+    {
+      "scenario": "dga",
+      "ps_ref": "c",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 2.9,
+      "fps": 0.3,
+      "off_classes": {
+        "encrypted_malware": 1
+      },
+      "flows_per_s": 4595,
+      "schema_errors": 0
+    },
+    {
+      "scenario": "dns_tunnel",
+      "ps_ref": "c",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 1.1,
+      "fps": 0.7,
+      "off_classes": {
+        "volumetric_ddos": 1,
+        "encrypted_malware": 1
+      },
+      "flows_per_s": 4967,
+      "schema_errors": 0
+    },
+    {
+      "scenario": "encrypted_malware",
+      "ps_ref": "d",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 3.2,
+      "fps": 0.7,
+      "off_classes": {
+        "encrypted_malware": 1,
+        "volumetric_ddos": 1
+      },
+      "flows_per_s": 5170,
+      "schema_errors": 0
+    },
+    {
+      "scenario": "exfiltration",
+      "ps_ref": "f",
+      "runs": 3,
+      "detected": 3,
+      "detection_rate": 1.0,
+      "median_ttd": 10.0,
+      "fps": 0.3,
+      "off_classes": {
+        "encrypted_malware": 1
+      },
+      "flows_per_s": 5217,
+      "schema_errors": 0
+    }
+  ],
+  "benign": {
+    "minutes": 15.0,
+    "records": 109279,
+    "false_alerts": 1,
+    "fp_per_hour": 4.0,
+    "false_incidents": 1,
+    "incidents_per_hour": 4.0,
+    "cold_start_alerts": 0,
+    "by_class": {
+      "volumetric_ddos": 1
+    },
+    "flows_per_s": 5079.0
+  }
+}

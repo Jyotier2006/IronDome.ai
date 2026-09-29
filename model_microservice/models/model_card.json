@@ -1,0 +1,3336 @@
+{
+  "generated_at": "2026-09-29T15:35:00+00:00",
+  "core_version": "2.0.0",
+  "sklearn": "1.8.0",
+  "numpy": "2.4.2",
+  "python": "3.14.2",
+  "quick": false,
+  "total_seconds": 59.1,
+  "detectors": {
+    "ddos": {
+      "detector": "ddos",
+      "title": "Volumetric / protocol DDoS classifier",
+      "threat_class": "volumetric_ddos",
+      "ps_ref": "a",
+      "algorithm": "HistGradientBoostingClassifier (161 boosting iterations after early stopping, 31 leaves, class-balanced) + isotonic probability calibration fitted on 3-fold cross-validated predictions",
+      "classes": [
+        "benign",
+        "syn_flood",
+        "udp_icmp_flood",
+        "udp_amplification",
+        "spoofed_flood",
+        "slow_http"
+      ],
+      "features": [
+        {
+          "name": "flows_per_s",
+          "description": "Flow records per second toward the entity in the window"
+        },
+        {
+          "name": "pkts_per_s",
+          "description": "Packets per second (both directions)"
+        },
+        {
+          "name": "bytes_per_s",
+          "description": "L3 bytes per second (both directions)"
+        },
+        {
+          "name": "bytes_per_pkt",
+          "description": "Mean bytes per packet sent toward the destination"
+        },
+        {
+          "name": "pkts_per_flow",
+          "description": "Mean packets per flow"
+        },
+        {
+          "name": "uniq_src",
+          "description": "Distinct source IPs"
+        },
+        {
+          "name": "src_entropy_bits",
+          "description": "Shannon entropy of the source-IP distribution (bits)"
+        },
+        {
+          "name": "src_entropy_norm",
+          "description": "Source-IP entropy normalised to [0,1] by log2(#sources)"
+        },
+        {
+          "name": "flows_per_src",
+          "description": "Mean flows per distinct source (~1 for spoofed floods)"
+        },
+        {
+          "name": "top_src_share",
+          "description": "Share of flows from the busiest source"
+        },
+        {
+          "name": "syn_only_ratio",
+          "description": "Share of TCP flows that sent SYN but never ACK (half-open)"
+        },
+        {
+          "name": "established_ratio",
+          "description": "Share of TCP flows with a completed, answered handshake"
+        },
+        {
+          "name": "tcp_ratio",
+          "description": "Share of TCP flows"
+        },
+        {
+          "name": "udp_ratio",
+          "description": "Share of UDP flows"
+        },
+        {
+          "name": "icmp_ratio",
+          "description": "Share of ICMP flows"
+        },
+        {
+          "name": "amp_port_ratio",
+          "description": "Share of UDP flows whose source port is an amplification service (DNS, NTP, SSDP, memcached...)"
+        },
+        {
+          "name": "unanswered_ratio",
+          "description": "Share of flows with no packet from the responder"
+        },
+        {
+          "name": "fwd_bwd_byte_ratio_log",
+          "description": "log10 of bytes toward / bytes from the destination"
+        },
+        {
+          "name": "mean_duration",
+          "description": "Mean flow duration (s)"
+        },
+        {
+          "name": "slow_conns",
+          "description": "Long-lived, very low-rate TCP connections (Slowloris signature)"
+        },
+        {
+          "name": "slow_ratio",
+          "description": "Share of flows that are long-lived and very low rate"
+        },
+        {
+          "name": "dport_entropy_norm",
+          "description": "Normalised entropy of targeted destination ports"
+        }
+      ],
+      "threshold": 0.595,
+      "threshold_rule": "attack if 1 - P(benign) >= threshold (best F1 on validation within a 0.5% false-positive budget)",
+      "train": {
+        "samples": 4200,
+        "per_class": {
+          "benign": 700,
+          "syn_flood": 700,
+          "udp_icmp_flood": 700,
+          "udp_amplification": 700,
+          "spoofed_flood": 700,
+          "slow_http": 700
+        },
+        "generation_seconds": 27.8,
+        "fit_seconds": 4.8
+      },
+      "metrics": {
+        "validation": {
+          "samples": 1680,
+          "precision": 0.9971,
+          "recall": 0.999,
+          "f1": 0.9981,
+          "false_positive_rate": 0.0048,
+          "roc_auc": 0.9982,
+          "pr_auc": 0.998,
+          "brier": 0.0046,
+          "ece": 0.0085,
+          "per_class": {
+            "benign": {
+              "precision": 0.9984,
+              "recall": 0.9952,
+              "f1": 0.9968,
+              "support": 630
+            },
+            "syn_flood": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 210
+            },
+            "udp_icmp_flood": {
+              "precision": 0.9905,
+              "recall": 0.9952,
+              "f1": 0.9929,
+              "support": 210
+            },
+            "udp_amplification": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 210
+            },
+            "spoofed_flood": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 210
+            },
+            "slow_http": {
+              "precision": 0.9858,
+              "recall": 0.9905,
+              "f1": 0.9881,
+              "support": 210
+            }
+          },
+          "macro_f1": 0.9963,
+          "confusion_matrix": [
+            [
+              627,
+              0,
+              0,
+              0,
+              0,
+              3
+            ],
+            [
+              0,
+              210,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              1,
+              0,
+              209,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              210,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              210,
+              0
+            ],
+            [
+              0,
+              0,
+              2,
+              0,
+              0,
+              208
+            ]
+          ],
+          "per_kind": {
+            "benign:clients": {
+              "n": 104,
+              "false_positive_rate": 0.0192
+            },
+            "benign:dns": {
+              "n": 80,
+              "false_positive_rate": 0.0
+            },
+            "benign:flash": {
+              "n": 56,
+              "false_positive_rate": 0.0
+            },
+            "benign:ntp": {
+              "n": 28,
+              "false_positive_rate": 0.0
+            },
+            "benign:quic": {
+              "n": 63,
+              "false_positive_rate": 0.0
+            },
+            "benign:scan_noise": {
+              "n": 66,
+              "false_positive_rate": 0.0152
+            },
+            "benign:voip": {
+              "n": 70,
+              "false_positive_rate": 0.0
+            },
+            "benign:web": {
+              "n": 163,
+              "false_positive_rate": 0.0
+            },
+            "slow_http": {
+              "n": 210,
+              "detection_rate": 1.0
+            },
+            "spoofed_flood": {
+              "n": 210,
+              "detection_rate": 1.0
+            },
+            "syn_flood": {
+              "n": 210,
+              "detection_rate": 1.0
+            },
+            "udp_amplification": {
+              "n": 210,
+              "detection_rate": 1.0
+            },
+            "udp_icmp_flood": {
+              "n": 210,
+              "detection_rate": 0.9952
+            }
+          }
+        },
+        "test": {
+          "samples": 1680,
+          "precision": 0.9934,
+          "recall": 0.999,
+          "f1": 0.9962,
+          "false_positive_rate": 0.0111,
+          "roc_auc": 0.999,
+          "pr_auc": 0.9989,
+          "brier": 0.0053,
+          "ece": 0.009,
+          "per_class": {
+            "benign": {
+              "precision": 0.9984,
+              "recall": 0.9889,
+              "f1": 0.9936,
+              "support": 630
+            },
+            "syn_flood": {
+              "precision": 0.9859,
+              "recall": 1.0,
+              "f1": 0.9929,
+              "support": 210
+            },
+            "udp_icmp_flood": {
+              "precision": 0.9813,
+              "recall": 1.0,
+              "f1": 0.9906,
+              "support": 210
+            },
+            "udp_amplification": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 210
+            },
+            "spoofed_flood": {
+              "precision": 1.0,
+              "recall": 0.9905,
+              "f1": 0.9952,
+              "support": 210
+            },
+            "slow_http": {
+              "precision": 0.9905,
+              "recall": 0.9952,
+              "f1": 0.9929,
+              "support": 210
+            }
+          },
+          "macro_f1": 0.9942,
+          "confusion_matrix": [
+            [
+              623,
+              2,
+              3,
+              0,
+              0,
+              2
+            ],
+            [
+              0,
+              210,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              210,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              210,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              1,
+              0,
+              208,
+              0
+            ],
+            [
+              1,
+              0,
+              0,
+              0,
+              0,
+              209
+            ]
+          ],
+          "per_kind": {
+            "benign:clients": {
+              "n": 100,
+              "false_positive_rate": 0.02
+            },
+            "benign:dns": {
+              "n": 99,
+              "false_positive_rate": 0.0
+            },
+            "benign:flash": {
+              "n": 54,
+              "false_positive_rate": 0.0
+            },
+            "benign:ntp": {
+              "n": 38,
+              "false_positive_rate": 0.0
+            },
+            "benign:quic": {
+              "n": 60,
+              "false_positive_rate": 0.0
+            },
+            "benign:scan_noise": {
+              "n": 67,
+              "false_positive_rate": 0.0448
+            },
+            "benign:voip": {
+              "n": 72,
+              "false_positive_rate": 0.0
+            },
+            "benign:web": {
+              "n": 140,
+              "false_positive_rate": 0.0143
+            },
+            "slow_http": {
+              "n": 210,
+              "detection_rate": 0.9952
+            },
+            "spoofed_flood": {
+              "n": 210,
+              "detection_rate": 1.0
+            },
+            "syn_flood": {
+              "n": 210,
+              "detection_rate": 1.0
+            },
+            "udp_amplification": {
+              "n": 210,
+              "detection_rate": 1.0
+            },
+            "udp_icmp_flood": {
+              "n": 210,
+              "detection_rate": 1.0
+            }
+          }
+        },
+        "stress": {
+          "samples": 1120,
+          "precision": 1.0,
+          "recall": 0.94,
+          "f1": 0.9691,
+          "false_positive_rate": 0.0,
+          "roc_auc": 0.9922,
+          "pr_auc": 0.9962,
+          "brier": 0.0261,
+          "ece": 0.0267,
+          "per_class": {
+            "benign": {
+              "precision": 0.9091,
+              "recall": 1.0,
+              "f1": 0.9524,
+              "support": 420
+            },
+            "syn_flood": {
+              "precision": 0.8561,
+              "recall": 0.85,
+              "f1": 0.853,
+              "support": 140
+            },
+            "udp_icmp_flood": {
+              "precision": 0.9214,
+              "recall": 0.9214,
+              "f1": 0.9214,
+              "support": 140
+            },
+            "udp_amplification": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 140
+            },
+            "spoofed_flood": {
+              "precision": 0.9358,
+              "recall": 0.7286,
+              "f1": 0.8193,
+              "support": 140
+            },
+            "slow_http": {
+              "precision": 1.0,
+              "recall": 0.9286,
+              "f1": 0.963,
+              "support": 140
+            }
+          },
+          "macro_f1": 0.9182,
+          "confusion_matrix": [
+            [
+              420,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              14,
+              119,
+              0,
+              0,
+              7,
+              0
+            ],
+            [
+              10,
+              1,
+              129,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              140,
+              0,
+              0
+            ],
+            [
+              9,
+              19,
+              10,
+              0,
+              102,
+              0
+            ],
+            [
+              9,
+              0,
+              1,
+              0,
+              0,
+              130
+            ]
+          ],
+          "per_kind": {
+            "benign:clients": {
+              "n": 79,
+              "false_positive_rate": 0.0
+            },
+            "benign:dns": {
+              "n": 48,
+              "false_positive_rate": 0.0
+            },
+            "benign:flash": {
+              "n": 39,
+              "false_positive_rate": 0.0
+            },
+            "benign:ntp": {
+              "n": 27,
+              "false_positive_rate": 0.0
+            },
+            "benign:quic": {
+              "n": 45,
+              "false_positive_rate": 0.0
+            },
+            "benign:scan_noise": {
+              "n": 40,
+              "false_positive_rate": 0.0
+            },
+            "benign:voip": {
+              "n": 40,
+              "false_positive_rate": 0.0
+            },
+            "benign:web": {
+              "n": 102,
+              "false_positive_rate": 0.0
+            },
+            "slow_http": {
+              "n": 140,
+              "detection_rate": 0.9357
+            },
+            "spoofed_flood": {
+              "n": 140,
+              "detection_rate": 0.9357
+            },
+            "syn_flood": {
+              "n": 140,
+              "detection_rate": 0.9
+            },
+            "udp_amplification": {
+              "n": 140,
+              "detection_rate": 1.0
+            },
+            "udp_icmp_flood": {
+              "n": 140,
+              "detection_rate": 0.9286
+            }
+          }
+        }
+      },
+      "baselines": {
+        "flows_per_s": {
+          "mean": 234.452857,
+          "std": 407.875055,
+          "p50": 99.75,
+          "p95": 857.05
+        },
+        "pkts_per_s": {
+          "mean": 8103.247143,
+          "std": 11524.080431,
+          "p50": 2933.5,
+          "p95": 35193.275
+        },
+        "bytes_per_s": {
+          "mean": 6792149.542857,
+          "std": 10306293.703602,
+          "p50": 2123699.5,
+          "p95": 28400986.55
+        },
+        "bytes_per_pkt": {
+          "mean": 196.840411,
+          "std": 241.270104,
+          "p50": 81.600139,
+          "p95": 722.544678
+        },
+        "pkts_per_flow": {
+          "mean": 52.100765,
+          "std": 56.65803,
+          "p50": 40.619608,
+          "p95": 199.409661
+        },
+        "uniq_src": {
+          "mean": 202.697143,
+          "std": 317.980929,
+          "p50": 64.5,
+          "p95": 821.85
+        },
+        "src_entropy_bits": {
+          "mean": 5.940063,
+          "std": 2.478357,
+          "p50": 5.816403,
+          "p95": 9.635107
+        },
+        "src_entropy_norm": {
+          "mean": 0.884713,
+          "std": 0.25296,
+          "p50": 0.977753,
+          "p95": 0.998791
+        },
+        "flows_per_src": {
+          "mean": 14.4874,
+          "std": 65.1676,
+          "p50": 1.722527,
+          "p95": 45.228125
+        },
+        "top_src_share": {
+          "mean": 0.14739,
+          "std": 0.269058,
+          "p50": 0.039989,
+          "p95": 0.963888
+        },
+        "syn_only_ratio": {
+          "mean": 0.226454,
+          "std": 0.398013,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "established_ratio": {
+          "mean": 0.514222,
+          "std": 0.479198,
+          "p50": 0.8,
+          "p95": 1.0
+        },
+        "tcp_ratio": {
+          "mean": 0.63248,
+          "std": 0.477194,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "udp_ratio": {
+          "mean": 0.36752,
+          "std": 0.477194,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "icmp_ratio": {
+          "mean": 0.0,
+          "std": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "amp_port_ratio": {
+          "mean": 0.0,
+          "std": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "unanswered_ratio": {
+          "mean": 0.046881,
+          "std": 0.125584,
+          "p50": 0.0,
+          "p95": 0.421212
+        },
+        "fwd_bwd_byte_ratio_log": {
+          "mean": -0.8987,
+          "std": 0.692272,
+          "p50": -1.328009,
+          "p95": 0.010675
+        },
+        "mean_duration": {
+          "mean": 3.928207,
+          "std": 3.397212,
+          "p50": 3.681364,
+          "p95": 8.621381
+        },
+        "slow_conns": {
+          "mean": 6.538571,
+          "std": 9.782489,
+          "p50": 0.0,
+          "p95": 27.0
+        },
+        "slow_ratio": {
+          "mean": 0.035081,
+          "std": 0.050385,
+          "p50": 0.0,
+          "p95": 0.142857
+        },
+        "dport_entropy_norm": {
+          "mean": 0.173867,
+          "std": 0.320122,
+          "p50": 0.0,
+          "p95": 0.99145
+        }
+      },
+      "importance": [
+        {
+          "feature": "unanswered_ratio",
+          "importance": 0.2238
+        },
+        {
+          "feature": "slow_ratio",
+          "importance": 0.1272
+        },
+        {
+          "feature": "dport_entropy_norm",
+          "importance": 0.0225
+        },
+        {
+          "feature": "mean_duration",
+          "importance": 0.011
+        },
+        {
+          "feature": "syn_only_ratio",
+          "importance": 0.0109
+        },
+        {
+          "feature": "flows_per_s",
+          "importance": 0.0098
+        },
+        {
+          "feature": "top_src_share",
+          "importance": 0.0088
+        },
+        {
+          "feature": "established_ratio",
+          "importance": 0.0055
+        },
+        {
+          "feature": "pkts_per_flow",
+          "importance": 0.0023
+        },
+        {
+          "feature": "fwd_bwd_byte_ratio_log",
+          "importance": 0.0014
+        }
+      ],
+      "inference_us_per_row": 19.47,
+      "file": "ddos.joblib",
+      "sha256": "d5ccf5ed497d67c67821e685df12f18d0592221cb7e877e3a83c648ae5e75af8"
+    },
+    "recon_scan": {
+      "detector": "recon_scan",
+      "title": "Reconnaissance / port-scan classifier",
+      "threat_class": "recon_scan",
+      "ps_ref": "e",
+      "algorithm": "HistGradientBoostingClassifier (90 boosting iterations after early stopping, 31 leaves, class-balanced) + isotonic probability calibration fitted on 3-fold cross-validated predictions",
+      "classes": [
+        "benign",
+        "vertical_scan",
+        "horizontal_scan"
+      ],
+      "features": [
+        {
+          "name": "n_flows",
+          "description": "Flows (connections) in the window"
+        },
+        {
+          "name": "flows_per_s",
+          "description": "Flow records per second toward the entity in the window"
+        },
+        {
+          "name": "uniq_hosts",
+          "description": "Distinct destination hosts contacted"
+        },
+        {
+          "name": "uniq_ports",
+          "description": "Distinct destination ports contacted"
+        },
+        {
+          "name": "uniq_pairs",
+          "description": "Distinct (host, port) pairs probed"
+        },
+        {
+          "name": "max_ports_per_host",
+          "description": "Most ports probed on a single host (vertical fan-out)"
+        },
+        {
+          "name": "max_hosts_per_port",
+          "description": "Most hosts probed on a single port (horizontal fan-out)"
+        },
+        {
+          "name": "failed_ratio",
+          "description": "Share of attempts unanswered or reset"
+        },
+        {
+          "name": "no_payload_ratio",
+          "description": "Share of flows that carried headers only (no payload)"
+        },
+        {
+          "name": "mean_pkts_per_flow",
+          "description": "Mean packets per flow"
+        },
+        {
+          "name": "port_entropy_norm",
+          "description": "Normalised entropy of destination ports"
+        },
+        {
+          "name": "host_entropy_norm",
+          "description": "Normalised entropy of destination hosts"
+        },
+        {
+          "name": "low_port_ratio",
+          "description": "Share of distinct ports below 1024"
+        },
+        {
+          "name": "port_contiguity",
+          "description": "Share of probed ports adjacent to another probed port"
+        },
+        {
+          "name": "tcp_ratio",
+          "description": "Share of TCP flows"
+        },
+        {
+          "name": "attempts_per_pair",
+          "description": "Connections per distinct (host, port) - scanners probe each once, retrying apps hammer the same few"
+        }
+      ],
+      "threshold": 0.82,
+      "threshold_rule": "attack if 1 - P(benign) >= threshold (best F1 on validation within a 0.5% false-positive budget)",
+      "train": {
+        "samples": 2700,
+        "per_class": {
+          "benign": 900,
+          "vertical_scan": 900,
+          "horizontal_scan": 900
+        },
+        "generation_seconds": 5.6,
+        "fit_seconds": 0.8
+      },
+      "metrics": {
+        "validation": {
+          "samples": 1350,
+          "precision": 0.9982,
+          "recall": 1.0,
+          "f1": 0.9991,
+          "false_positive_rate": 0.0012,
+          "roc_auc": 0.9994,
+          "pr_auc": 0.9982,
+          "brier": 0.0015,
+          "ece": 0.0027,
+          "per_class": {
+            "benign": {
+              "precision": 1.0,
+              "recall": 0.9988,
+              "f1": 0.9994,
+              "support": 810
+            },
+            "vertical_scan": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 270
+            },
+            "horizontal_scan": {
+              "precision": 0.9963,
+              "recall": 1.0,
+              "f1": 0.9982,
+              "support": 270
+            }
+          },
+          "macro_f1": 0.9992,
+          "confusion_matrix": [
+            [
+              809,
+              0,
+              1
+            ],
+            [
+              0,
+              270,
+              0
+            ],
+            [
+              0,
+              0,
+              270
+            ]
+          ],
+          "per_kind": {
+            "browse": {
+              "n": 176,
+              "false_positive_rate": 0.0
+            },
+            "horizontal_scan": {
+              "n": 270,
+              "detection_rate": 1.0
+            },
+            "mail": {
+              "n": 71,
+              "false_positive_rate": 0.0
+            },
+            "p2p": {
+              "n": 118,
+              "false_positive_rate": 0.0
+            },
+            "poller": {
+              "n": 109,
+              "false_positive_rate": 0.0
+            },
+            "proxy": {
+              "n": 114,
+              "false_positive_rate": 0.0
+            },
+            "resolver": {
+              "n": 80,
+              "false_positive_rate": 0.0
+            },
+            "retry_storm": {
+              "n": 61,
+              "false_positive_rate": 0.0164
+            },
+            "udp_flood_src": {
+              "n": 81,
+              "false_positive_rate": 0.0
+            },
+            "vertical_scan": {
+              "n": 270,
+              "detection_rate": 1.0
+            }
+          }
+        },
+        "test": {
+          "samples": 1350,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "false_positive_rate": 0.0,
+          "roc_auc": 1.0,
+          "pr_auc": 1.0,
+          "brier": 0.0005,
+          "ece": 0.0008,
+          "per_class": {
+            "benign": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 810
+            },
+            "vertical_scan": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 270
+            },
+            "horizontal_scan": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 270
+            }
+          },
+          "macro_f1": 1.0,
+          "confusion_matrix": [
+            [
+              810,
+              0,
+              0
+            ],
+            [
+              0,
+              270,
+              0
+            ],
+            [
+              0,
+              0,
+              270
+            ]
+          ],
+          "per_kind": {
+            "browse": {
+              "n": 188,
+              "false_positive_rate": 0.0
+            },
+            "horizontal_scan": {
+              "n": 270,
+              "detection_rate": 1.0
+            },
+            "mail": {
+              "n": 63,
+              "false_positive_rate": 0.0
+            },
+            "p2p": {
+              "n": 140,
+              "false_positive_rate": 0.0
+            },
+            "poller": {
+              "n": 105,
+              "false_positive_rate": 0.0
+            },
+            "proxy": {
+              "n": 118,
+              "false_positive_rate": 0.0
+            },
+            "resolver": {
+              "n": 72,
+              "false_positive_rate": 0.0
+            },
+            "retry_storm": {
+              "n": 45,
+              "false_positive_rate": 0.0
+            },
+            "udp_flood_src": {
+              "n": 79,
+              "false_positive_rate": 0.0
+            },
+            "vertical_scan": {
+              "n": 270,
+              "detection_rate": 1.0
+            }
+          }
+        },
+        "stress": {
+          "samples": 900,
+          "precision": 1.0,
+          "recall": 0.9972,
+          "f1": 0.9986,
+          "false_positive_rate": 0.0,
+          "roc_auc": 1.0,
+          "pr_auc": 1.0,
+          "brier": 0.0014,
+          "ece": 0.0035,
+          "per_class": {
+            "benign": {
+              "precision": 0.9982,
+              "recall": 1.0,
+              "f1": 0.9991,
+              "support": 540
+            },
+            "vertical_scan": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 180
+            },
+            "horizontal_scan": {
+              "precision": 1.0,
+              "recall": 0.9944,
+              "f1": 0.9972,
+              "support": 180
+            }
+          },
+          "macro_f1": 0.9988,
+          "confusion_matrix": [
+            [
+              540,
+              0,
+              0
+            ],
+            [
+              0,
+              180,
+              0
+            ],
+            [
+              1,
+              0,
+              179
+            ]
+          ],
+          "per_kind": {
+            "browse": {
+              "n": 108,
+              "false_positive_rate": 0.0
+            },
+            "horizontal_scan": {
+              "n": 180,
+              "detection_rate": 0.9944
+            },
+            "mail": {
+              "n": 48,
+              "false_positive_rate": 0.0
+            },
+            "p2p": {
+              "n": 105,
+              "false_positive_rate": 0.0
+            },
+            "poller": {
+              "n": 66,
+              "false_positive_rate": 0.0
+            },
+            "proxy": {
+              "n": 69,
+              "false_positive_rate": 0.0
+            },
+            "resolver": {
+              "n": 43,
+              "false_positive_rate": 0.0
+            },
+            "retry_storm": {
+              "n": 26,
+              "false_positive_rate": 0.0
+            },
+            "udp_flood_src": {
+              "n": 75,
+              "false_positive_rate": 0.0
+            },
+            "vertical_scan": {
+              "n": 180,
+              "detection_rate": 1.0
+            }
+          }
+        }
+      },
+      "baselines": {
+        "n_flows": {
+          "mean": 546.357778,
+          "std": 1022.027942,
+          "p50": 186.0,
+          "p95": 2685.05
+        },
+        "flows_per_s": {
+          "mean": 21.472987,
+          "std": 50.544037,
+          "p50": 6.2,
+          "p95": 89.501667
+        },
+        "uniq_hosts": {
+          "mean": 129.091111,
+          "std": 186.625884,
+          "p50": 56.0,
+          "p95": 542.1
+        },
+        "uniq_ports": {
+          "mean": 305.963333,
+          "std": 1011.797094,
+          "p50": 2.0,
+          "p95": 2638.35
+        },
+        "uniq_pairs": {
+          "mean": 440.572222,
+          "std": 996.009327,
+          "p50": 89.0,
+          "p95": 2638.35
+        },
+        "max_ports_per_host": {
+          "mean": 289.477778,
+          "std": 1015.273233,
+          "p50": 1.0,
+          "p95": 2638.35
+        },
+        "max_hosts_per_port": {
+          "mean": 86.321111,
+          "std": 136.974386,
+          "p50": 32.0,
+          "p95": 359.2
+        },
+        "failed_ratio": {
+          "mean": 0.219,
+          "std": 0.368016,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "no_payload_ratio": {
+          "mean": 0.090218,
+          "std": 0.188275,
+          "p50": 0.0,
+          "p95": 0.647187
+        },
+        "mean_pkts_per_flow": {
+          "mean": 61.264259,
+          "std": 54.748735,
+          "p50": 50.83022,
+          "p95": 151.869364
+        },
+        "port_entropy_norm": {
+          "mean": 0.743665,
+          "std": 0.419076,
+          "p50": 0.988535,
+          "p95": 1.0
+        },
+        "host_entropy_norm": {
+          "mean": 0.822265,
+          "std": 0.295924,
+          "p50": 0.978247,
+          "p95": 1.0
+        },
+        "low_port_ratio": {
+          "mean": 0.588987,
+          "std": 0.433193,
+          "p50": 0.6,
+          "p95": 1.0
+        },
+        "port_contiguity": {
+          "mean": 0.009054,
+          "std": 0.030022,
+          "p50": 0.0,
+          "p95": 0.078959
+        },
+        "tcp_ratio": {
+          "mean": 0.654011,
+          "std": 0.368021,
+          "p50": 0.751462,
+          "p95": 1.0
+        },
+        "attempts_per_pair": {
+          "mean": 3.793833,
+          "std": 10.291337,
+          "p50": 1.156725,
+          "p95": 7.366802
+        }
+      },
+      "importance": [
+        {
+          "feature": "no_payload_ratio",
+          "importance": 0.4236
+        },
+        {
+          "feature": "uniq_hosts",
+          "importance": 0.2365
+        },
+        {
+          "feature": "mean_pkts_per_flow",
+          "importance": 0.0517
+        },
+        {
+          "feature": "max_hosts_per_port",
+          "importance": 0.0006
+        },
+        {
+          "feature": "port_contiguity",
+          "importance": 0.0003
+        },
+        {
+          "feature": "uniq_ports",
+          "importance": 0.0
+        },
+        {
+          "feature": "n_flows",
+          "importance": 0.0
+        },
+        {
+          "feature": "flows_per_s",
+          "importance": 0.0
+        },
+        {
+          "feature": "failed_ratio",
+          "importance": 0.0
+        },
+        {
+          "feature": "max_ports_per_host",
+          "importance": 0.0
+        }
+      ],
+      "inference_us_per_row": 5.27,
+      "file": "recon_scan.joblib",
+      "sha256": "917e72f58512c4e29150644c2d21aa8c1236cc2c0c00942e1d7753f43539a1df"
+    },
+    "c2_beacon": {
+      "detector": "c2_beacon",
+      "title": "C2 beaconing (periodicity) classifier",
+      "threat_class": "c2_beaconing",
+      "ps_ref": "b",
+      "algorithm": "HistGradientBoostingClassifier (114 boosting iterations after early stopping, 31 leaves, class-balanced) + isotonic probability calibration fitted on 3-fold cross-validated predictions",
+      "classes": [
+        "benign",
+        "beacon"
+      ],
+      "features": [
+        {
+          "name": "n_conns",
+          "description": "Connections observed for the host pair"
+        },
+        {
+          "name": "span_s",
+          "description": "Time span covered by those connections (s)"
+        },
+        {
+          "name": "iat_mean",
+          "description": "Mean inter-arrival time between connections (s)"
+        },
+        {
+          "name": "iat_median",
+          "description": "Median inter-arrival time (s)"
+        },
+        {
+          "name": "iat_std",
+          "description": "Standard deviation of inter-arrival time (s)"
+        },
+        {
+          "name": "iat_cv",
+          "description": "Coefficient of variation of inter-arrival time (low = periodic)"
+        },
+        {
+          "name": "iat_mad_ratio",
+          "description": "Median absolute deviation / median of inter-arrival time (jitter)"
+        },
+        {
+          "name": "iat_regularity",
+          "description": "Share of inter-arrivals within +/-20% of the median"
+        },
+        {
+          "name": "bytes_fwd_mean",
+          "description": "Mean bytes sent per connection"
+        },
+        {
+          "name": "bytes_fwd_cv",
+          "description": "Variation of bytes sent per connection (low = scripted)"
+        },
+        {
+          "name": "bytes_bwd_mean",
+          "description": "Mean bytes received per connection"
+        },
+        {
+          "name": "bytes_bwd_cv",
+          "description": "Variation of bytes received per connection"
+        },
+        {
+          "name": "dur_mean",
+          "description": "Mean connection duration (s)"
+        },
+        {
+          "name": "dst_prevalence",
+          "description": "Distinct internal hosts that contacted this destination in the last hour (popular service vs rare C2)"
+        },
+        {
+          "name": "dport_web",
+          "description": "1 if the destination port is a web/TLS port"
+        },
+        {
+          "name": "proto_udp",
+          "description": "1 if the connections are UDP"
+        }
+      ],
+      "threshold": 0.83,
+      "threshold_rule": "attack if 1 - P(benign) >= threshold (best F1 on validation within a 0.5% false-positive budget)",
+      "train": {
+        "samples": 5000,
+        "per_class": {
+          "benign": 2500,
+          "beacon": 2500
+        },
+        "generation_seconds": 1.2,
+        "fit_seconds": 1.2
+      },
+      "metrics": {
+        "validation": {
+          "samples": 3000,
+          "precision": 0.9947,
+          "recall": 0.9987,
+          "f1": 0.9967,
+          "false_positive_rate": 0.0018,
+          "roc_auc": 0.9998,
+          "pr_auc": 0.9985,
+          "brier": 0.0023,
+          "ece": 0.0032,
+          "confusion_matrix": [
+            [
+              2246,
+              4
+            ],
+            [
+              1,
+              749
+            ]
+          ],
+          "per_kind": {
+            "beacon": {
+              "n": 750,
+              "detection_rate": 0.9987
+            },
+            "chat": {
+              "n": 234,
+              "false_positive_rate": 0.0
+            },
+            "cron_api": {
+              "n": 189,
+              "false_positive_rate": 0.0106
+            },
+            "heartbeat": {
+              "n": 348,
+              "false_positive_rate": 0.0029
+            },
+            "irregular": {
+              "n": 608,
+              "false_positive_rate": 0.0
+            },
+            "mail": {
+              "n": 213,
+              "false_positive_rate": 0.0047
+            },
+            "ntp": {
+              "n": 366,
+              "false_positive_rate": 0.0
+            },
+            "update": {
+              "n": 292,
+              "false_positive_rate": 0.0
+            }
+          }
+        },
+        "test": {
+          "samples": 3000,
+          "precision": 0.996,
+          "recall": 0.9933,
+          "f1": 0.9947,
+          "false_positive_rate": 0.0013,
+          "roc_auc": 0.9999,
+          "pr_auc": 0.9998,
+          "brier": 0.003,
+          "ece": 0.0032,
+          "confusion_matrix": [
+            [
+              2247,
+              3
+            ],
+            [
+              5,
+              745
+            ]
+          ],
+          "per_kind": {
+            "beacon": {
+              "n": 750,
+              "detection_rate": 0.9933
+            },
+            "chat": {
+              "n": 231,
+              "false_positive_rate": 0.0
+            },
+            "cron_api": {
+              "n": 167,
+              "false_positive_rate": 0.006
+            },
+            "heartbeat": {
+              "n": 390,
+              "false_positive_rate": 0.0
+            },
+            "irregular": {
+              "n": 646,
+              "false_positive_rate": 0.0031
+            },
+            "mail": {
+              "n": 202,
+              "false_positive_rate": 0.0
+            },
+            "ntp": {
+              "n": 301,
+              "false_positive_rate": 0.0
+            },
+            "update": {
+              "n": 313,
+              "false_positive_rate": 0.0
+            }
+          }
+        },
+        "stress": {
+          "samples": 2000,
+          "precision": 0.9779,
+          "recall": 0.974,
+          "f1": 0.976,
+          "false_positive_rate": 0.0073,
+          "roc_auc": 0.9981,
+          "pr_auc": 0.9893,
+          "brier": 0.0082,
+          "ece": 0.0058,
+          "confusion_matrix": [
+            [
+              1489,
+              11
+            ],
+            [
+              13,
+              487
+            ]
+          ],
+          "per_kind": {
+            "beacon": {
+              "n": 500,
+              "detection_rate": 0.974
+            },
+            "chat": {
+              "n": 147,
+              "false_positive_rate": 0.0
+            },
+            "cron_api": {
+              "n": 263,
+              "false_positive_rate": 0.038
+            },
+            "heartbeat": {
+              "n": 245,
+              "false_positive_rate": 0.0041
+            },
+            "irregular": {
+              "n": 360,
+              "false_positive_rate": 0.0
+            },
+            "mail": {
+              "n": 123,
+              "false_positive_rate": 0.0
+            },
+            "ntp": {
+              "n": 186,
+              "false_positive_rate": 0.0
+            },
+            "update": {
+              "n": 176,
+              "false_positive_rate": 0.0
+            }
+          }
+        }
+      },
+      "baselines": {
+        "n_conns": {
+          "mean": 23.4532,
+          "std": 10.214608,
+          "p50": 24.0,
+          "p95": 39.0
+        },
+        "span_s": {
+          "mean": 10339.329772,
+          "std": 22696.479577,
+          "p50": 3511.610054,
+          "p95": 41941.24623
+        },
+        "iat_mean": {
+          "mean": 463.278005,
+          "std": 958.445238,
+          "p50": 185.942124,
+          "p95": 1882.364768
+        },
+        "iat_median": {
+          "mean": 356.896638,
+          "std": 574.275136,
+          "p50": 146.315708,
+          "p95": 1623.258555
+        },
+        "iat_std": {
+          "mean": 360.250302,
+          "std": 3234.796986,
+          "p50": 5.740731,
+          "p95": 1296.688434
+        },
+        "iat_cv": {
+          "mean": 0.479629,
+          "std": 0.827937,
+          "p50": 0.033759,
+          "p95": 2.220593
+        },
+        "iat_mad_ratio": {
+          "mean": 0.208918,
+          "std": 0.309896,
+          "p50": 0.026898,
+          "p95": 0.815201
+        },
+        "iat_regularity": {
+          "mean": 0.765323,
+          "std": 0.377835,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "bytes_fwd_mean": {
+          "mean": 2841.444774,
+          "std": 1330.183451,
+          "p50": 3051.820707,
+          "p95": 4509.207102
+        },
+        "bytes_fwd_cv": {
+          "mean": 0.585438,
+          "std": 0.345382,
+          "p50": 0.596288,
+          "p95": 1.131696
+        },
+        "bytes_bwd_mean": {
+          "mean": 40016.00062,
+          "std": 33731.61468,
+          "p50": 35741.831318,
+          "p95": 93899.856456
+        },
+        "bytes_bwd_cv": {
+          "mean": 1.446951,
+          "std": 0.797502,
+          "p50": 1.479455,
+          "p95": 2.700222
+        },
+        "dur_mean": {
+          "mean": 4.963394,
+          "std": 2.210556,
+          "p50": 5.596347,
+          "p95": 7.260557
+        },
+        "dst_prevalence": {
+          "mean": 50.9896,
+          "std": 61.734126,
+          "p50": 22.0,
+          "p95": 195.05
+        },
+        "dport_web": {
+          "mean": 0.8552,
+          "std": 0.351899,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "proto_udp": {
+          "mean": 0.1448,
+          "std": 0.351899,
+          "p50": 0.0,
+          "p95": 1.0
+        }
+      },
+      "importance": [
+        {
+          "feature": "dst_prevalence",
+          "importance": 0.3266
+        },
+        {
+          "feature": "bytes_fwd_mean",
+          "importance": 0.0256
+        },
+        {
+          "feature": "iat_cv",
+          "importance": 0.0155
+        },
+        {
+          "feature": "bytes_bwd_cv",
+          "importance": 0.0101
+        },
+        {
+          "feature": "dur_mean",
+          "importance": 0.0093
+        },
+        {
+          "feature": "iat_mean",
+          "importance": 0.0057
+        },
+        {
+          "feature": "bytes_bwd_mean",
+          "importance": 0.0057
+        },
+        {
+          "feature": "iat_mad_ratio",
+          "importance": 0.0022
+        },
+        {
+          "feature": "bytes_fwd_cv",
+          "importance": 0.0009
+        },
+        {
+          "feature": "span_s",
+          "importance": 0.0004
+        }
+      ],
+      "inference_us_per_row": 3.06,
+      "file": "c2_beacon.joblib",
+      "sha256": "a03138d562008552226557791920f24df3ab0d9a9f2c75585a3e4a24ed72408a"
+    },
+    "dga_domain": {
+      "detector": "dga_domain",
+      "title": "DGA domain (lexical) classifier",
+      "threat_class": "dga_dns_tunnelling",
+      "ps_ref": "c",
+      "algorithm": "HistGradientBoostingClassifier (76 boosting iterations after early stopping, 31 leaves, class-balanced) + isotonic probability calibration fitted on 3-fold cross-validated predictions",
+      "classes": [
+        "benign",
+        "dga"
+      ],
+      "features": [
+        {
+          "name": "length",
+          "description": "Length of the second-level label"
+        },
+        {
+          "name": "entropy",
+          "description": "Shannon entropy of the label's characters"
+        },
+        {
+          "name": "digit_ratio",
+          "description": "Share of digits"
+        },
+        {
+          "name": "vowel_ratio",
+          "description": "Share of vowels among letters"
+        },
+        {
+          "name": "consonant_max_run",
+          "description": "Longest run of consecutive consonants"
+        },
+        {
+          "name": "digit_max_run",
+          "description": "Longest run of consecutive digits"
+        },
+        {
+          "name": "unique_char_ratio",
+          "description": "Distinct characters / length"
+        },
+        {
+          "name": "hex_ratio",
+          "description": "Share of characters in [0-9a-f]"
+        },
+        {
+          "name": "bigram_score",
+          "description": "Mean log10 character-bigram probability under an English/benign-domain model"
+        },
+        {
+          "name": "dict_coverage",
+          "description": "Share of the label covered by dictionary words"
+        },
+        {
+          "name": "hyphen_count",
+          "description": "Number of hyphens"
+        },
+        {
+          "name": "tld_rarity",
+          "description": "0 popular TLD, 1 other, 2 frequently abused TLD"
+        },
+        {
+          "name": "n_labels",
+          "description": "Number of labels in the full query name"
+        },
+        {
+          "name": "sub_length",
+          "description": "Length of the subdomain part"
+        }
+      ],
+      "threshold": 0.57,
+      "threshold_rule": "attack if 1 - P(benign) >= threshold (best F1 on validation within a 0.5% false-positive budget)",
+      "train": {
+        "samples": 12000,
+        "per_class": {
+          "benign": 6000,
+          "dga": 6000
+        },
+        "generation_seconds": 0.2,
+        "fit_seconds": 1.2
+      },
+      "metrics": {
+        "validation": {
+          "samples": 7200,
+          "precision": 0.9919,
+          "recall": 0.9511,
+          "f1": 0.9711,
+          "false_positive_rate": 0.0026,
+          "roc_auc": 0.9958,
+          "pr_auc": 0.9887,
+          "brier": 0.0162,
+          "ece": 0.0255,
+          "confusion_matrix": [
+            [
+              5386,
+              14
+            ],
+            [
+              88,
+              1712
+            ]
+          ],
+          "per_kind": {
+            "alnum": {
+              "n": 393,
+              "detection_rate": 1.0
+            },
+            "benign": {
+              "n": 5400,
+              "false_positive_rate": 0.0026
+            },
+            "hex": {
+              "n": 349,
+              "detection_rate": 1.0
+            },
+            "pronounceable": {
+              "n": 348,
+              "detection_rate": 0.9971
+            },
+            "random_alpha": {
+              "n": 360,
+              "detection_rate": 0.9972
+            },
+            "wordlist": {
+              "n": 350,
+              "detection_rate": 0.7543
+            }
+          }
+        },
+        "test": {
+          "samples": 7200,
+          "precision": 0.9873,
+          "recall": 0.9472,
+          "f1": 0.9668,
+          "false_positive_rate": 0.0041,
+          "roc_auc": 0.9953,
+          "pr_auc": 0.9878,
+          "brier": 0.0171,
+          "ece": 0.0242,
+          "confusion_matrix": [
+            [
+              5378,
+              22
+            ],
+            [
+              95,
+              1705
+            ]
+          ],
+          "per_kind": {
+            "alnum": {
+              "n": 385,
+              "detection_rate": 0.9974
+            },
+            "benign": {
+              "n": 5400,
+              "false_positive_rate": 0.0041
+            },
+            "hex": {
+              "n": 343,
+              "detection_rate": 1.0
+            },
+            "pronounceable": {
+              "n": 366,
+              "detection_rate": 1.0
+            },
+            "random_alpha": {
+              "n": 334,
+              "detection_rate": 0.997
+            },
+            "wordlist": {
+              "n": 372,
+              "detection_rate": 0.75
+            }
+          }
+        },
+        "stress": {
+          "samples": 4800,
+          "precision": 0.9875,
+          "recall": 0.8542,
+          "f1": 0.916,
+          "false_positive_rate": 0.0036,
+          "roc_auc": 0.9873,
+          "pr_auc": 0.9663,
+          "brier": 0.0308,
+          "ece": 0.0094,
+          "confusion_matrix": [
+            [
+              3587,
+              13
+            ],
+            [
+              175,
+              1025
+            ]
+          ],
+          "per_kind": {
+            "benign": {
+              "n": 3600,
+              "false_positive_rate": 0.0036
+            },
+            "pronounceable": {
+              "n": 624,
+              "detection_rate": 0.992
+            },
+            "wordlist": {
+              "n": 576,
+              "detection_rate": 0.7049
+            }
+          }
+        }
+      },
+      "baselines": {
+        "length": {
+          "mean": 7.447167,
+          "std": 2.750614,
+          "p50": 7.0,
+          "p95": 12.0
+        },
+        "entropy": {
+          "mean": 2.48686,
+          "std": 0.541009,
+          "p50": 2.584963,
+          "p95": 3.175123
+        },
+        "digit_ratio": {
+          "mean": 0.012835,
+          "std": 0.061997,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "vowel_ratio": {
+          "mean": 0.356878,
+          "std": 0.15015,
+          "p50": 0.363636,
+          "p95": 0.571429
+        },
+        "consonant_max_run": {
+          "mean": 2.348667,
+          "std": 0.899869,
+          "p50": 2.0,
+          "p95": 4.0
+        },
+        "digit_max_run": {
+          "mean": 0.076,
+          "std": 0.395673,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "unique_char_ratio": {
+          "mean": 0.857196,
+          "std": 0.121145,
+          "p50": 0.857143,
+          "p95": 1.0
+        },
+        "hex_ratio": {
+          "mean": 0.319978,
+          "std": 0.172228,
+          "p50": 0.307692,
+          "p95": 0.583333
+        },
+        "bigram_score": {
+          "mean": -1.259851,
+          "std": 0.19086,
+          "p50": -1.223065,
+          "p95": -1.045282
+        },
+        "dict_coverage": {
+          "mean": 0.48662,
+          "std": 0.423755,
+          "p50": 0.555556,
+          "p95": 1.0
+        },
+        "hyphen_count": {
+          "mean": 0.007,
+          "std": 0.083373,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "tld_rarity": {
+          "mean": 0.003,
+          "std": 0.05469,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "n_labels": {
+          "mean": 2.100167,
+          "std": 0.300222,
+          "p50": 2.0,
+          "p95": 3.0
+        },
+        "sub_length": {
+          "mean": 0.0,
+          "std": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        }
+      },
+      "importance": [
+        {
+          "feature": "length",
+          "importance": 0.2404
+        },
+        {
+          "feature": "tld_rarity",
+          "importance": 0.1975
+        },
+        {
+          "feature": "bigram_score",
+          "importance": 0.1665
+        },
+        {
+          "feature": "dict_coverage",
+          "importance": 0.0325
+        },
+        {
+          "feature": "consonant_max_run",
+          "importance": 0.0206
+        },
+        {
+          "feature": "n_labels",
+          "importance": 0.0026
+        },
+        {
+          "feature": "entropy",
+          "importance": 0.0013
+        },
+        {
+          "feature": "digit_max_run",
+          "importance": 0.0012
+        },
+        {
+          "feature": "hex_ratio",
+          "importance": 0.0008
+        },
+        {
+          "feature": "hyphen_count",
+          "importance": 0.0
+        }
+      ],
+      "inference_us_per_row": 2.57,
+      "file": "dga_domain.joblib",
+      "sha256": "f8e7593b61a21deac10c11ebeeeff0a51cb2fd3791d795ab38acd79d44adc6a0"
+    },
+    "dns_tunnel": {
+      "detector": "dns_tunnel",
+      "title": "DNS tunnelling classifier",
+      "threat_class": "dga_dns_tunnelling",
+      "ps_ref": "c",
+      "algorithm": "HistGradientBoostingClassifier (112 boosting iterations after early stopping, 31 leaves, class-balanced) + isotonic probability calibration fitted on 3-fold cross-validated predictions",
+      "classes": [
+        "benign",
+        "tunnel"
+      ],
+      "features": [
+        {
+          "name": "queries",
+          "description": "DNS queries to the base domain in 60 s"
+        },
+        {
+          "name": "query_rate",
+          "description": "Queries per second"
+        },
+        {
+          "name": "unique_ratio",
+          "description": "Distinct query names / queries (tunnels never repeat)"
+        },
+        {
+          "name": "mean_qname_len",
+          "description": "Mean full query-name length"
+        },
+        {
+          "name": "max_qname_len",
+          "description": "Longest query name"
+        },
+        {
+          "name": "mean_sub_len",
+          "description": "Mean length of the subdomain part (encoded payload)"
+        },
+        {
+          "name": "max_label_len",
+          "description": "Longest single label (63 max)"
+        },
+        {
+          "name": "mean_label_len",
+          "description": "Mean subdomain label length"
+        },
+        {
+          "name": "sub_entropy_mean",
+          "description": "Mean character entropy of the subdomain part"
+        },
+        {
+          "name": "sub_digit_ratio",
+          "description": "Share of digits in subdomains"
+        },
+        {
+          "name": "txt_null_ratio",
+          "description": "Share of TXT / NULL / CNAME / MX / SRV / ANY queries"
+        },
+        {
+          "name": "non_addr_ratio",
+          "description": "Share of queries that are not A / AAAA / HTTPS"
+        },
+        {
+          "name": "mean_req_bytes",
+          "description": "Mean request size (bytes)"
+        },
+        {
+          "name": "mean_resp_bytes",
+          "description": "Mean response size (bytes)"
+        },
+        {
+          "name": "nx_ratio",
+          "description": "Share of NXDOMAIN responses"
+        }
+      ],
+      "threshold": 0.51,
+      "threshold_rule": "attack if 1 - P(benign) >= threshold (best F1 on validation within a 0.5% false-positive budget)",
+      "train": {
+        "samples": 3000,
+        "per_class": {
+          "benign": 1500,
+          "tunnel": 1500
+        },
+        "generation_seconds": 8.7,
+        "fit_seconds": 0.5
+      },
+      "metrics": {
+        "validation": {
+          "samples": 1800,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "false_positive_rate": 0.0,
+          "roc_auc": 1.0,
+          "pr_auc": 1.0,
+          "brier": 0.0,
+          "ece": 0.0005,
+          "confusion_matrix": [
+            [
+              1350,
+              0
+            ],
+            [
+              0,
+              450
+            ]
+          ],
+          "per_kind": {
+            "av": {
+              "n": 281,
+              "false_positive_rate": 0.0
+            },
+            "cdn": {
+              "n": 215,
+              "false_positive_rate": 0.0
+            },
+            "dnsbl": {
+              "n": 149,
+              "false_positive_rate": 0.0
+            },
+            "dnscat": {
+              "n": 152,
+              "detection_rate": 1.0
+            },
+            "iodine": {
+              "n": 167,
+              "detection_rate": 1.0
+            },
+            "mail_txt": {
+              "n": 138,
+              "false_positive_rate": 0.0
+            },
+            "site": {
+              "n": 195,
+              "false_positive_rate": 0.0
+            },
+            "slow": {
+              "n": 131,
+              "detection_rate": 1.0
+            },
+            "srv": {
+              "n": 117,
+              "false_positive_rate": 0.0
+            },
+            "telemetry": {
+              "n": 255,
+              "false_positive_rate": 0.0
+            }
+          }
+        },
+        "test": {
+          "samples": 1800,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "false_positive_rate": 0.0,
+          "roc_auc": 1.0,
+          "pr_auc": 1.0,
+          "brier": 0.0,
+          "ece": 0.0005,
+          "confusion_matrix": [
+            [
+              1350,
+              0
+            ],
+            [
+              0,
+              450
+            ]
+          ],
+          "per_kind": {
+            "av": {
+              "n": 257,
+              "false_positive_rate": 0.0
+            },
+            "cdn": {
+              "n": 207,
+              "false_positive_rate": 0.0
+            },
+            "dnsbl": {
+              "n": 130,
+              "false_positive_rate": 0.0
+            },
+            "dnscat": {
+              "n": 150,
+              "detection_rate": 1.0
+            },
+            "iodine": {
+              "n": 150,
+              "detection_rate": 1.0
+            },
+            "mail_txt": {
+              "n": 121,
+              "false_positive_rate": 0.0
+            },
+            "site": {
+              "n": 188,
+              "false_positive_rate": 0.0
+            },
+            "slow": {
+              "n": 150,
+              "detection_rate": 1.0
+            },
+            "srv": {
+              "n": 130,
+              "false_positive_rate": 0.0
+            },
+            "telemetry": {
+              "n": 317,
+              "false_positive_rate": 0.0
+            }
+          }
+        },
+        "stress": {
+          "samples": 1200,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "false_positive_rate": 0.0,
+          "roc_auc": 1.0,
+          "pr_auc": 1.0,
+          "brier": 0.0,
+          "ece": 0.0005,
+          "confusion_matrix": [
+            [
+              900,
+              0
+            ],
+            [
+              0,
+              300
+            ]
+          ],
+          "per_kind": {
+            "av": {
+              "n": 175,
+              "false_positive_rate": 0.0
+            },
+            "cdn": {
+              "n": 132,
+              "false_positive_rate": 0.0
+            },
+            "dnsbl": {
+              "n": 94,
+              "false_positive_rate": 0.0
+            },
+            "dnscat": {
+              "n": 95,
+              "detection_rate": 1.0
+            },
+            "mail_txt": {
+              "n": 81,
+              "false_positive_rate": 0.0
+            },
+            "site": {
+              "n": 157,
+              "false_positive_rate": 0.0
+            },
+            "slow": {
+              "n": 205,
+              "detection_rate": 1.0
+            },
+            "srv": {
+              "n": 86,
+              "false_positive_rate": 0.0
+            },
+            "telemetry": {
+              "n": 175,
+              "false_positive_rate": 0.0
+            }
+          }
+        }
+      },
+      "baselines": {
+        "queries": {
+          "mean": 72.834667,
+          "std": 59.124259,
+          "p50": 56.0,
+          "p95": 197.0
+        },
+        "query_rate": {
+          "mean": 1.232763,
+          "std": 0.976079,
+          "p50": 0.94785,
+          "p95": 3.283333
+        },
+        "unique_ratio": {
+          "mean": 0.576958,
+          "std": 0.430987,
+          "p50": 0.666667,
+          "p95": 1.0
+        },
+        "mean_qname_len": {
+          "mean": 32.223331,
+          "std": 12.282039,
+          "p50": 29.762572,
+          "p95": 55.392446
+        },
+        "max_qname_len": {
+          "mean": 37.861333,
+          "std": 14.7352,
+          "p50": 33.0,
+          "p95": 66.0
+        },
+        "mean_sub_len": {
+          "mean": 16.645028,
+          "std": 10.659339,
+          "p50": 12.912166,
+          "p95": 36.530274
+        },
+        "max_label_len": {
+          "mean": 16.090667,
+          "std": 13.445536,
+          "p50": 9.0,
+          "p95": 40.0
+        },
+        "mean_label_len": {
+          "mean": 8.826778,
+          "std": 5.405985,
+          "p50": 5.614144,
+          "p95": 17.765137
+        },
+        "sub_entropy_mean": {
+          "mean": 2.966472,
+          "std": 0.759291,
+          "p50": 3.033569,
+          "p95": 4.04063
+        },
+        "sub_digit_ratio": {
+          "mean": 0.287948,
+          "std": 0.276819,
+          "p50": 0.057051,
+          "p95": 0.633244
+        },
+        "txt_null_ratio": {
+          "mean": 0.160534,
+          "std": 0.345728,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "non_addr_ratio": {
+          "mean": 0.160534,
+          "std": 0.345728,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "mean_req_bytes": {
+          "mean": 78.223331,
+          "std": 12.282039,
+          "p50": 75.762572,
+          "p95": 101.392446
+        },
+        "mean_resp_bytes": {
+          "mean": 139.798127,
+          "std": 26.843359,
+          "p50": 134.385931,
+          "p95": 186.991002
+        },
+        "nx_ratio": {
+          "mean": 0.096193,
+          "std": 0.278867,
+          "p50": 0.0,
+          "p95": 0.908371
+        }
+      },
+      "importance": [
+        {
+          "feature": "max_label_len",
+          "importance": 0.7513
+        },
+        {
+          "feature": "queries",
+          "importance": 0.0
+        },
+        {
+          "feature": "unique_ratio",
+          "importance": 0.0
+        },
+        {
+          "feature": "query_rate",
+          "importance": 0.0
+        },
+        {
+          "feature": "mean_qname_len",
+          "importance": 0.0
+        },
+        {
+          "feature": "max_qname_len",
+          "importance": 0.0
+        },
+        {
+          "feature": "mean_sub_len",
+          "importance": 0.0
+        },
+        {
+          "feature": "mean_label_len",
+          "importance": 0.0
+        },
+        {
+          "feature": "sub_entropy_mean",
+          "importance": 0.0
+        },
+        {
+          "feature": "sub_digit_ratio",
+          "importance": 0.0
+        }
+      ],
+      "inference_us_per_row": 3.27,
+      "file": "dns_tunnel.joblib",
+      "sha256": "52a0243764a2d08ef8163f63f58590118a119092753353132da1f807ebb04d82"
+    },
+    "encrypted_malware": {
+      "detector": "encrypted_malware",
+      "title": "Encrypted-session malware classifier",
+      "threat_class": "encrypted_malware",
+      "ps_ref": "d",
+      "algorithm": "HistGradientBoostingClassifier (94 boosting iterations after early stopping, 31 leaves, class-balanced) + isotonic probability calibration fitted on 3-fold cross-validated predictions",
+      "classes": [
+        "benign",
+        "malware"
+      ],
+      "features": [
+        {
+          "name": "duration",
+          "description": "Flow duration (s)"
+        },
+        {
+          "name": "pkts_total",
+          "description": "Packets in both directions"
+        },
+        {
+          "name": "bytes_fwd",
+          "description": "Bytes sent by the client"
+        },
+        {
+          "name": "bytes_bwd",
+          "description": "Bytes sent by the server"
+        },
+        {
+          "name": "byte_ratio_log",
+          "description": "log10 of client bytes / server bytes"
+        },
+        {
+          "name": "splt_fwd_mean",
+          "description": "Mean client packet length over the first packets"
+        },
+        {
+          "name": "splt_fwd_std",
+          "description": "Std of client packet lengths"
+        },
+        {
+          "name": "splt_bwd_mean",
+          "description": "Mean server packet length"
+        },
+        {
+          "name": "splt_bwd_std",
+          "description": "Std of server packet lengths"
+        },
+        {
+          "name": "splt_iat_mean",
+          "description": "Mean inter-packet time over the first packets (ms)"
+        },
+        {
+          "name": "splt_iat_std",
+          "description": "Std of inter-packet time (ms)"
+        },
+        {
+          "name": "splt_iat_max",
+          "description": "Largest inter-packet gap (ms)"
+        },
+        {
+          "name": "first_fwd_len",
+          "description": "Size of the first client packet (ClientHello)"
+        },
+        {
+          "name": "first_bwd_len",
+          "description": "Size of the first server packet (ServerHello/certificate)"
+        },
+        {
+          "name": "small_pkt_ratio",
+          "description": "Share of packets under 100 bytes"
+        },
+        {
+          "name": "tls13",
+          "description": "1 if TLS 1.3 was negotiated/offered"
+        },
+        {
+          "name": "sni_present",
+          "description": "1 if the ClientHello carried SNI"
+        },
+        {
+          "name": "sni_is_ip",
+          "description": "1 if SNI is an IP literal"
+        },
+        {
+          "name": "sni_entropy",
+          "description": "Character entropy of the SNI"
+        },
+        {
+          "name": "sni_len",
+          "description": "SNI length"
+        },
+        {
+          "name": "sni_digit_ratio",
+          "description": "Share of digits in the SNI"
+        },
+        {
+          "name": "sni_tld_rarity",
+          "description": "TLD rarity of the SNI (0 popular .. 2 abused)"
+        },
+        {
+          "name": "alpn_present",
+          "description": "1 if ALPN was offered"
+        },
+        {
+          "name": "cipher_count",
+          "description": "Cipher suites offered"
+        },
+        {
+          "name": "ext_count",
+          "description": "TLS extensions offered"
+        },
+        {
+          "name": "ja3_prevalence",
+          "description": "Distinct internal hosts using this JA3 in the last hour"
+        },
+        {
+          "name": "dst_prevalence",
+          "description": "Distinct internal hosts that contacted this destination in the last hour (popular service vs rare C2)"
+        },
+        {
+          "name": "is_quic",
+          "description": "1 for QUIC (UDP/443)"
+        }
+      ],
+      "threshold": 0.275,
+      "threshold_rule": "attack if 1 - P(benign) >= threshold (best F1 on validation within a 0.5% false-positive budget)",
+      "train": {
+        "samples": 6000,
+        "per_class": {
+          "benign": 3000,
+          "malware": 3000
+        },
+        "generation_seconds": 0.4,
+        "fit_seconds": 0.9
+      },
+      "metrics": {
+        "validation": {
+          "samples": 3600,
+          "precision": 0.9934,
+          "recall": 0.9978,
+          "f1": 0.9956,
+          "false_positive_rate": 0.0022,
+          "roc_auc": 0.9994,
+          "pr_auc": 0.9989,
+          "brier": 0.0022,
+          "ece": 0.0017,
+          "confusion_matrix": [
+            [
+              2694,
+              6
+            ],
+            [
+              2,
+              898
+            ]
+          ],
+          "per_kind": {
+            "api_tool": {
+              "n": 389,
+              "false_positive_rate": 0.0
+            },
+            "app_periodic": {
+              "n": 393,
+              "false_positive_rate": 0.0153
+            },
+            "browser": {
+              "n": 1332,
+              "false_positive_rate": 0.0
+            },
+            "chrome": {
+              "n": 174,
+              "detection_rate": 0.9885
+            },
+            "download": {
+              "n": 278,
+              "false_positive_rate": 0.0
+            },
+            "mal_go_implant": {
+              "n": 131,
+              "detection_rate": 1.0
+            },
+            "mal_legacy_ssl": {
+              "n": 167,
+              "detection_rate": 1.0
+            },
+            "mal_minimal": {
+              "n": 140,
+              "detection_rate": 1.0
+            },
+            "mal_py_implant": {
+              "n": 130,
+              "detection_rate": 1.0
+            },
+            "quic": {
+              "n": 340,
+              "false_positive_rate": 0.0941
+            },
+            "schannel": {
+              "n": 126,
+              "detection_rate": 1.0
+            }
+          }
+        },
+        "test": {
+          "samples": 3600,
+          "precision": 0.9945,
+          "recall": 1.0,
+          "f1": 0.9972,
+          "false_positive_rate": 0.0019,
+          "roc_auc": 1.0,
+          "pr_auc": 0.9999,
+          "brier": 0.0012,
+          "ece": 0.0011,
+          "confusion_matrix": [
+            [
+              2695,
+              5
+            ],
+            [
+              0,
+              900
+            ]
+          ],
+          "per_kind": {
+            "api_tool": {
+              "n": 370,
+              "false_positive_rate": 0.0
+            },
+            "app_periodic": {
+              "n": 374,
+              "false_positive_rate": 0.0134
+            },
+            "browser": {
+              "n": 1352,
+              "false_positive_rate": 0.0
+            },
+            "chrome": {
+              "n": 163,
+              "detection_rate": 1.0
+            },
+            "download": {
+              "n": 274,
+              "false_positive_rate": 0.0
+            },
+            "mal_go_implant": {
+              "n": 128,
+              "detection_rate": 1.0
+            },
+            "mal_legacy_ssl": {
+              "n": 151,
+              "detection_rate": 1.0
+            },
+            "mal_minimal": {
+              "n": 128,
+              "detection_rate": 1.0
+            },
+            "mal_py_implant": {
+              "n": 148,
+              "detection_rate": 1.0
+            },
+            "quic": {
+              "n": 375,
+              "false_positive_rate": 0.12
+            },
+            "schannel": {
+              "n": 137,
+              "detection_rate": 1.0
+            }
+          }
+        },
+        "stress": {
+          "samples": 2400,
+          "precision": 0.9967,
+          "recall": 0.9983,
+          "f1": 0.9975,
+          "false_positive_rate": 0.0011,
+          "roc_auc": 1.0,
+          "pr_auc": 0.9999,
+          "brier": 0.0014,
+          "ece": 0.0027,
+          "confusion_matrix": [
+            [
+              1798,
+              2
+            ],
+            [
+              1,
+              599
+            ]
+          ],
+          "per_kind": {
+            "api_tool": {
+              "n": 459,
+              "false_positive_rate": 0.0
+            },
+            "app_periodic": {
+              "n": 200,
+              "false_positive_rate": 0.01
+            },
+            "browser": {
+              "n": 779,
+              "false_positive_rate": 0.0
+            },
+            "chrome": {
+              "n": 375,
+              "detection_rate": 0.9973
+            },
+            "download": {
+              "n": 157,
+              "false_positive_rate": 0.0
+            },
+            "quic": {
+              "n": 227,
+              "false_positive_rate": 0.0969
+            },
+            "schannel": {
+              "n": 203,
+              "detection_rate": 1.0
+            }
+          }
+        }
+      },
+      "baselines": {
+        "duration": {
+          "mean": 5.831846,
+          "std": 4.038469,
+          "p50": 6.685678,
+          "p95": 10.0
+        },
+        "pkts_total": {
+          "mean": 82.547,
+          "std": 181.707086,
+          "p50": 42.0,
+          "p95": 248.05
+        },
+        "bytes_fwd": {
+          "mean": 3686.630333,
+          "std": 3486.410431,
+          "p50": 2728.5,
+          "p95": 8751.1
+        },
+        "bytes_bwd": {
+          "mean": 71551.949333,
+          "std": 185153.223844,
+          "p50": 29713.0,
+          "p95": 236093.3
+        },
+        "byte_ratio_log": {
+          "mean": -0.892035,
+          "std": 0.588593,
+          "p50": -1.036896,
+          "p95": 0.1852
+        },
+        "splt_fwd_mean": {
+          "mean": 371.339315,
+          "std": 118.565857,
+          "p50": 352.666667,
+          "p95": 632.35
+        },
+        "splt_fwd_std": {
+          "mean": 210.582531,
+          "std": 134.496072,
+          "p50": 172.147868,
+          "p95": 510.668375
+        },
+        "splt_bwd_mean": {
+          "mean": 1131.569334,
+          "std": 345.481266,
+          "p50": 1277.029412,
+          "p95": 1438.601818
+        },
+        "splt_bwd_std": {
+          "mean": 270.174974,
+          "std": 116.70445,
+          "p50": 283.269565,
+          "p95": 451.74697
+        },
+        "splt_iat_mean": {
+          "mean": 68.620551,
+          "std": 200.086958,
+          "p50": 11.014762,
+          "p95": 612.563271
+        },
+        "splt_iat_std": {
+          "mean": 122.969308,
+          "std": 348.550765,
+          "p50": 23.949321,
+          "p95": 1159.745612
+        },
+        "splt_iat_max": {
+          "mean": 354.118056,
+          "std": 1005.174247,
+          "p50": 69.2395,
+          "p95": 3297.54375
+        },
+        "first_fwd_len": {
+          "mean": 448.274667,
+          "std": 315.625886,
+          "p50": 349.0,
+          "p95": 1280.0
+        },
+        "first_bwd_len": {
+          "mean": 1245.540333,
+          "std": 160.343601,
+          "p50": 1246.0,
+          "p95": 1463.0
+        },
+        "small_pkt_ratio": {
+          "mean": 0.006021,
+          "std": 0.020989,
+          "p50": 0.0,
+          "p95": 0.066667
+        },
+        "tls13": {
+          "mean": 0.843333,
+          "std": 0.363486,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "sni_present": {
+          "mean": 0.879667,
+          "std": 0.325351,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "sni_is_ip": {
+          "mean": 0.0,
+          "std": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "sni_entropy": {
+          "mean": 2.294518,
+          "std": 0.979616,
+          "p50": 2.584963,
+          "p95": 3.277613
+        },
+        "sni_len": {
+          "mean": 14.76,
+          "std": 7.055617,
+          "p50": 16.0,
+          "p95": 26.0
+        },
+        "sni_digit_ratio": {
+          "mean": 0.036179,
+          "std": 0.103765,
+          "p50": 0.0,
+          "p95": 0.321429
+        },
+        "sni_tld_rarity": {
+          "mean": 0.123333,
+          "std": 0.328819,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "alpn_present": {
+          "mean": 0.879667,
+          "std": 0.325351,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "cipher_count": {
+          "mean": 16.567667,
+          "std": 7.592678,
+          "p50": 17.0,
+          "p95": 31.0
+        },
+        "ext_count": {
+          "mean": 11.496333,
+          "std": 4.89176,
+          "p50": 13.0,
+          "p95": 16.0
+        },
+        "ja3_prevalence": {
+          "mean": 50.063333,
+          "std": 60.430406,
+          "p50": 22.0,
+          "p95": 190.0
+        },
+        "dst_prevalence": {
+          "mean": 59.763333,
+          "std": 68.933736,
+          "p50": 30.0,
+          "p95": 218.0
+        },
+        "is_quic": {
+          "mean": 0.120333,
+          "std": 0.325351,
+          "p50": 0.0,
+          "p95": 1.0
+        }
+      },
+      "importance": [
+        {
+          "feature": "dst_prevalence",
+          "importance": 0.5499
+        },
+        {
+          "feature": "ext_count",
+          "importance": 0.1523
+        },
+        {
+          "feature": "splt_bwd_mean",
+          "importance": 0.1401
+        },
+        {
+          "feature": "sni_entropy",
+          "importance": 0.0155
+        },
+        {
+          "feature": "sni_len",
+          "importance": 0.0049
+        },
+        {
+          "feature": "sni_tld_rarity",
+          "importance": 0.0031
+        },
+        {
+          "feature": "alpn_present",
+          "importance": 0.0027
+        },
+        {
+          "feature": "first_fwd_len",
+          "importance": 0.0018
+        },
+        {
+          "feature": "splt_bwd_std",
+          "importance": 0.0018
+        },
+        {
+          "feature": "ja3_prevalence",
+          "importance": 0.0018
+        }
+      ],
+      "inference_us_per_row": 3.09,
+      "file": "encrypted_malware.joblib",
+      "sha256": "29d583f609fcd0b397faf4c75922155eee717ff3730cfee94a75b5a11e768169"
+    },
+    "exfiltration": {
+      "detector": "exfiltration",
+      "title": "Data exfiltration (volume asymmetry) classifier",
+      "threat_class": "data_exfiltration",
+      "ps_ref": "f",
+      "algorithm": "HistGradientBoostingClassifier (67 boosting iterations after early stopping, 31 leaves, class-balanced) + isotonic probability calibration fitted on 3-fold cross-validated predictions",
+      "classes": [
+        "benign",
+        "exfiltration"
+      ],
+      "features": [
+        {
+          "name": "bytes_out_mb",
+          "description": "MB sent from the internal host to the destination in 60 s"
+        },
+        {
+          "name": "bytes_in_mb",
+          "description": "MB received from the destination in 60 s"
+        },
+        {
+          "name": "out_in_ratio_log",
+          "description": "log10 of outbound / inbound bytes"
+        },
+        {
+          "name": "pkts_out",
+          "description": "Packets sent"
+        },
+        {
+          "name": "n_flows",
+          "description": "Flows (connections) in the window"
+        },
+        {
+          "name": "upload_rate_kbps",
+          "description": "Upload rate (kbit/s)"
+        },
+        {
+          "name": "mean_flow_mb",
+          "description": "Mean MB sent per flow"
+        },
+        {
+          "name": "active_s",
+          "description": "Seconds with transfer activity"
+        },
+        {
+          "name": "dst_prevalence",
+          "description": "Distinct internal hosts that contacted this destination in the last hour (popular service vs rare C2)"
+        },
+        {
+          "name": "host_out_zscore",
+          "description": "Host's outbound volume vs its own baseline (z-score)"
+        },
+        {
+          "name": "host_baseline_mb",
+          "description": "Host's usual outbound MB per minute (EWMA)"
+        },
+        {
+          "name": "share_of_host_out",
+          "description": "Share of the host's outbound bytes going to this destination"
+        },
+        {
+          "name": "dport_class",
+          "description": "0 web/TLS, 1 admin/file-transfer (SSH, FTP, SMB, DB), 2 other"
+        }
+      ],
+      "threshold": 0.68,
+      "threshold_rule": "attack if 1 - P(benign) >= threshold (best F1 on validation within a 0.5% false-positive budget)",
+      "train": {
+        "samples": 4000,
+        "per_class": {
+          "benign": 2000,
+          "exfiltration": 2000
+        },
+        "generation_seconds": 0.4,
+        "fit_seconds": 0.6
+      },
+      "metrics": {
+        "validation": {
+          "samples": 2400,
+          "precision": 0.9931,
+          "recall": 0.955,
+          "f1": 0.9737,
+          "false_positive_rate": 0.0022,
+          "roc_auc": 0.9982,
+          "pr_auc": 0.9932,
+          "brier": 0.0157,
+          "ece": 0.0199,
+          "confusion_matrix": [
+            [
+              1796,
+              4
+            ],
+            [
+              27,
+              573
+            ]
+          ],
+          "per_kind": {
+            "backup": {
+              "n": 568,
+              "false_positive_rate": 0.0
+            },
+            "exfiltration": {
+              "n": 600,
+              "detection_rate": 0.955
+            },
+            "git": {
+              "n": 284,
+              "false_positive_rate": 0.0
+            },
+            "mail": {
+              "n": 280,
+              "false_positive_rate": 0.0
+            },
+            "partner_sftp": {
+              "n": 159,
+              "false_positive_rate": 0.0252
+            },
+            "photo": {
+              "n": 167,
+              "false_positive_rate": 0.0
+            },
+            "screenshare": {
+              "n": 163,
+              "false_positive_rate": 0.0
+            },
+            "video_upload": {
+              "n": 179,
+              "false_positive_rate": 0.0
+            }
+          }
+        },
+        "test": {
+          "samples": 2400,
+          "precision": 0.9982,
+          "recall": 0.95,
+          "f1": 0.9735,
+          "false_positive_rate": 0.0006,
+          "roc_auc": 0.9981,
+          "pr_auc": 0.9927,
+          "brier": 0.0138,
+          "ece": 0.0146,
+          "confusion_matrix": [
+            [
+              1799,
+              1
+            ],
+            [
+              30,
+              570
+            ]
+          ],
+          "per_kind": {
+            "backup": {
+              "n": 574,
+              "false_positive_rate": 0.0
+            },
+            "exfiltration": {
+              "n": 600,
+              "detection_rate": 0.95
+            },
+            "git": {
+              "n": 275,
+              "false_positive_rate": 0.0
+            },
+            "mail": {
+              "n": 268,
+              "false_positive_rate": 0.0
+            },
+            "partner_sftp": {
+              "n": 133,
+              "false_positive_rate": 0.0075
+            },
+            "photo": {
+              "n": 179,
+              "false_positive_rate": 0.0
+            },
+            "screenshare": {
+              "n": 181,
+              "false_positive_rate": 0.0
+            },
+            "video_upload": {
+              "n": 190,
+              "false_positive_rate": 0.0
+            }
+          }
+        },
+        "stress": {
+          "samples": 1600,
+          "precision": 0.9897,
+          "recall": 0.965,
+          "f1": 0.9772,
+          "false_positive_rate": 0.0033,
+          "roc_auc": 0.9974,
+          "pr_auc": 0.9912,
+          "brier": 0.0247,
+          "ece": 0.0441,
+          "confusion_matrix": [
+            [
+              1196,
+              4
+            ],
+            [
+              14,
+              386
+            ]
+          ],
+          "per_kind": {
+            "backup": {
+              "n": 347,
+              "false_positive_rate": 0.0
+            },
+            "exfiltration": {
+              "n": 400,
+              "detection_rate": 0.965
+            },
+            "git": {
+              "n": 169,
+              "false_positive_rate": 0.0
+            },
+            "mail": {
+              "n": 173,
+              "false_positive_rate": 0.0
+            },
+            "partner_sftp": {
+              "n": 199,
+              "false_positive_rate": 0.0201
+            },
+            "photo": {
+              "n": 106,
+              "false_positive_rate": 0.0
+            },
+            "screenshare": {
+              "n": 104,
+              "false_positive_rate": 0.0
+            },
+            "video_upload": {
+              "n": 102,
+              "false_positive_rate": 0.0
+            }
+          }
+        }
+      },
+      "baselines": {
+        "bytes_out_mb": {
+          "mean": 103.316062,
+          "std": 194.530446,
+          "p50": 25.676705,
+          "p95": 583.407088
+        },
+        "bytes_in_mb": {
+          "mean": 3.506162,
+          "std": 7.27958,
+          "p50": 0.593436,
+          "p95": 17.382506
+        },
+        "out_in_ratio_log": {
+          "mean": 1.584237,
+          "std": 0.30564,
+          "p50": 1.664312,
+          "p95": 1.868449
+        },
+        "pkts_out": {
+          "mean": 70129.08,
+          "std": 131973.124454,
+          "p50": 17681.5,
+          "p95": 392285.5
+        },
+        "n_flows": {
+          "mean": 4.667,
+          "std": 1.753029,
+          "p50": 5.0,
+          "p95": 7.0
+        },
+        "upload_rate_kbps": {
+          "mean": 23049.521865,
+          "std": 54676.747396,
+          "p50": 5650.250522,
+          "p95": 106254.247707
+        },
+        "mean_flow_mb": {
+          "mean": 24.899214,
+          "std": 54.314309,
+          "p50": 6.04891,
+          "p95": 120.278086
+        },
+        "active_s": {
+          "mean": 42.836044,
+          "std": 18.180722,
+          "p50": 47.768886,
+          "p95": 60.0
+        },
+        "dst_prevalence": {
+          "mean": 69.434,
+          "std": 66.427394,
+          "p50": 42.0,
+          "p95": 214.05
+        },
+        "host_out_zscore": {
+          "mean": 16.050474,
+          "std": 21.216057,
+          "p50": 4.339217,
+          "p95": 50.0
+        },
+        "host_baseline_mb": {
+          "mean": 42.004265,
+          "std": 130.352544,
+          "p50": 1.014908,
+          "p95": 293.774232
+        },
+        "share_of_host_out": {
+          "mean": 1.0,
+          "std": 0.0,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "dport_class": {
+          "mean": 0.2605,
+          "std": 0.545564,
+          "p50": 0.0,
+          "p95": 2.0
+        }
+      },
+      "importance": [
+        {
+          "feature": "dst_prevalence",
+          "importance": 0.684
+        },
+        {
+          "feature": "dport_class",
+          "importance": 0.0916
+        },
+        {
+          "feature": "active_s",
+          "importance": 0.0887
+        },
+        {
+          "feature": "n_flows",
+          "importance": 0.0082
+        },
+        {
+          "feature": "upload_rate_kbps",
+          "importance": 0.0009
+        },
+        {
+          "feature": "mean_flow_mb",
+          "importance": 0.0004
+        },
+        {
+          "feature": "bytes_in_mb",
+          "importance": 0.0004
+        },
+        {
+          "feature": "pkts_out",
+          "importance": 0.0
+        },
+        {
+          "feature": "share_of_host_out",
+          "importance": 0.0
+        },
+        {
+          "feature": "host_baseline_mb",
+          "importance": -0.0004
+        }
+      ],
+      "inference_us_per_row": 2.46,
+      "file": "exfiltration.joblib",
+      "sha256": "fd1f429ef1742359b08938c632e7e99d2b8e6e85b23add025f6f1b2c3cbbcfd3"
+    }
+  }
+}

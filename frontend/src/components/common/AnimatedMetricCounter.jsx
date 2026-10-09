@@ -6,28 +6,27 @@ import { useEffect, useRef, useState } from 'react'
  */
 export default function CountUp({ value, duration = 500, decimals = 0, className = '' }) {
   const [display, setDisplay] = useState(value)
-  const fromRef = useRef(value)
+  const shownRef = useRef(value)   // the number currently on screen, mid-tween included
   const rafRef = useRef(null)
 
   useEffect(() => {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
+      shownRef.current = value
       setDisplay(value)
-      return
+      return undefined
     }
 
-    const from = typeof fromRef.current === 'number' ? fromRef.current : value
+    // tween from what is on screen, so a change mid-animation never jumps
+    const from = typeof shownRef.current === 'number' && Number.isFinite(shownRef.current) ? shownRef.current : value
     const start = performance.now()
     cancelAnimationFrame(rafRef.current)
 
     const tick = (now) => {
       const t = Math.min(1, Math.max(0, (now - start) / duration))
       const eased = 1 - Math.pow(1 - t, 3)
-      setDisplay(from + (value - from) * eased)
-      if (t < 1) {
-        rafRef.current = requestAnimationFrame(tick)
-      } else {
-        fromRef.current = value
-      }
+      shownRef.current = from + (value - from) * eased
+      setDisplay(shownRef.current)
+      if (t < 1) rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafRef.current)

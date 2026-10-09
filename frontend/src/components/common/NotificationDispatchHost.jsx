@@ -14,7 +14,7 @@ const toneBorder = {
   warning: 'border-status-warning/25',
 }
 
-export default function ToastHost() {
+export default function ToastHost({ offsetRight = 0 }) {
   const [items, setItems] = useState([])
 
   const remove = useCallback((id) => {
@@ -28,8 +28,8 @@ export default function ToastHost() {
 
   return (
     <div
-      className="fixed top-4 right-4 z-[60] flex flex-col gap-2 items-end pointer-events-none"
-      style={{ maxWidth: 320 }}
+      className="fixed top-4 z-[60] flex flex-col gap-2 items-end pointer-events-none transition-[right] duration-300"
+      style={{ right: 16 + offsetRight, maxWidth: `min(360px, calc(100vw - ${32 + offsetRight}px))` }}
     >
       <AnimatePresence>
         {items.map((item) => (
@@ -43,7 +43,7 @@ export default function ToastHost() {
             className={`glass-card bg-background-secondary/95 border px-3.5 py-2.5 pointer-events-auto flex items-center gap-2.5 shadow-lg ${toneBorder[item.type] || toneBorder.info}`}
           >
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${toneDot[item.type] || toneDot.info}`} />
-            <span className="text-caption text-text-secondary whitespace-nowrap">{item.message}</span>
+            <span className="text-caption text-text-secondary break-words min-w-0">{item.message}</span>
           </motion.div>
         ))}
       </AnimatePresence>

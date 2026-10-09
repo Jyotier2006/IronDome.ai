@@ -31,7 +31,7 @@ const POSTURE = [
   { icon: 'lock', label: 'No return path', title: 'No block / isolate / rate-limit action exists' },
 ]
 
-export default function GlobalStatusBar({ connected, stats, openIncidents, paused, onTogglePause, onOpenPalette }) {
+export default function GlobalStatusBar({ connected, stats, openIncidents, autoAttacks = false, paused, onTogglePause, onOpenPalette }) {
   const [now, setNow] = useState(new Date())
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
@@ -65,6 +65,12 @@ export default function GlobalStatusBar({ connected, stats, openIncidents, pause
                        animate={{ opacity: [1, 0.45, 1] }} transition={{ duration: 2, repeat: Infinity }} />
           {USE_MOCK ? 'Demo data' : connected ? 'Sensor live' : 'Sensor offline'}
         </span>
+        {autoAttacks && connected && (
+          <span title="The sensor was started with IRONDOME_AUTO_SCENARIOS=on: the traffic lab injects a random attack every ~2 minutes"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-status-warning/10 border border-status-warning/30 text-[11px] text-text-primary whitespace-nowrap">
+            <Icon name="beaker" className="w-3.5 h-3.5" /> Auto attacks on
+          </span>
+        )}
         {POSTURE.map((p) => (
           <span key={p.label} title={p.title}
                 className="hidden 2xl:inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-[11px] text-text-secondary">
@@ -80,8 +86,8 @@ export default function GlobalStatusBar({ connected, stats, openIncidents, pause
         <Kpi label="Open" value={openIncidents} />
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="text-right hidden sm:block">
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="text-right hidden lg:block whitespace-nowrap">
           <p className="text-body font-mono text-text-primary tabular-nums leading-none">{now.toLocaleTimeString('en-GB', { hour12: false })}</p>
           <p className="text-[11px] text-text-muted">{now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</p>
         </div>
@@ -89,7 +95,7 @@ export default function GlobalStatusBar({ connected, stats, openIncidents, pause
                 className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-text-muted hover:text-text-secondary"
                 title="Command palette">
           <Icon name="search" className="w-3.5 h-3.5" />
-          <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10">Ctrl K</kbd>
+          <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 whitespace-nowrap">Ctrl K</kbd>
         </button>
         <button type="button" onClick={onTogglePause} title={paused ? 'Resume flow view' : 'Pause flow view'}
                 className={`p-2 rounded-lg transition-colors ${paused ? 'bg-status-warning/20 text-text-primary' : 'hover:bg-white/[0.06] text-text-secondary'}`}>

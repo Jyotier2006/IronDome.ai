@@ -1,8 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { subscribe } from '@services/realtimeTransportClient'
 import { CLASS_ORDER, SEVERITY } from '@/constants/threatModel'
 
 const MAX_INCIDENTS = 400
+const MAX_CLEARED = 1000
+const TRIAGE_KEY = 'irondome.triage'
+
+// Triage state (acknowledged / cleared) is kept per sensor run in this browser: a page
+// reload keeps it, a sensor restart - whose incidents are all new - starts clean.
+function loadTriage(bootId) {
+  try {
+    const t = JSON.parse(localStorage.getItem(TRIAGE_KEY) || 'null')
+    if (t && t.boot_id === bootId) return { acked: t.acked || {}, cleared: t.cleared || [] }
+  } catch { /* storage blocked or corrupt: start clean */ }
+  return { acked: {}, cleared: [] }
+}
+
+function saveTriage(bootId, acked, cleared) {
+  try {
+    localStorage.setItem(TRIAGE_KEY, JSON.stringify({ boot_id: bootId, acked, cleared }))
+  } catch { /* storage blocked: triage still works until the page is reloaded */ }
+}
+
+const byNewest = (a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp)
 
 /**
  * Incident feed. The sensor already correlates raw per-window alerts into one
@@ -13,23 +33,45 @@ const MAX_INCIDENTS = 400
 export default function useIncidentStore() {
   const [incidents, setIncidents] = useState([])
   const [acked, setAcked] = useState({})
+  const [cleared, setCleared] = useState([])                   // incident ids removed with "Clear ack'd"
+  const [bootId, setBootId] = useState(undefined)              // undefined until the first hello
+  const [lastNew, setLastNew] = useState(null)                 // latest newly raised incident (never a snapshot)
   const [statusFilter, setStatusFilter] = useState('all')      // all | open | acknowledged
   const [classFilter, setClassFilter] = useState(null)         // threat_class id | null
   const [severityFilter, setSeverityFilter] = useState(null)   // severity | null
   const [selectedId, setSelectedId] = useState(null)
+  const bootRef = useRef(undefined)
+  const clearedRef = useRef(new Set())
 
   useEffect(() => {
     const unsubs = [
+      subscribe('hello', (h) => {
+        const id = h.boot_id ?? null
+        if (id === bootRef.current) return                     // reconnected to the same sensor run
+        const restarted = bootRef.current !== undefined
+        bootRef.current = id
+        const triage = loadTriage(id)
+        clearedRef.current = new Set(triage.cleared)
+        setBootId(id)
+        setAcked(triage.acked)
+        setCleared(triage.cleared)
+        if (restarted) {
+          setIncidents([])
+          setSelectedId(null)
+          setLastNew(null)
+        }
+      }),
       subscribe('incidents_snapshot', (list) => {
         if (!Array.isArray(list)) return
         setIncidents((prev) => {
           const byId = new Map(prev.map((i) => [i.incident_id, i]))
-          list.forEach((i) => byId.set(i.incident_id, i))
-          return [...byId.values()].sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp)).slice(0, MAX_INCIDENTS)
+          list.forEach((i) => { if (!clearedRef.current.has(i.incident_id)) byId.set(i.incident_id, i) })
+          return [...byId.values()].sort(byNewest).slice(0, MAX_INCIDENTS)
         })
       }),
       subscribe('alert', (inc) => {
         setIncidents((prev) => [inc, ...prev.filter((i) => i.incident_id !== inc.incident_id)].slice(0, MAX_INCIDENTS))
+        setLastNew(inc)
       }),
       subscribe('alert_update', (u) => {
         setIncidents((prev) => prev.map((i) => (i.incident_id === u.incident_id ? { ...i, ...u } : i)))
@@ -37,6 +79,10 @@ export default function useIncidentStore() {
     ]
     return () => unsubs.forEach((u) => u())
   }, [])
+
+  useEffect(() => {
+    if (bootId !== undefined) saveTriage(bootId, acked, cleared)
+  }, [bootId, acked, cleared])
 
   const isAcked = useCallback((id) => Boolean(acked[id]), [acked])
 
@@ -80,13 +126,19 @@ export default function useIncidentStore() {
     })
   }, [incidents])
   const clearAcknowledged = useCallback(() => {
+    const ids = incidents.filter((i) => acked[i.incident_id]).map((i) => i.incident_id)
+    if (!ids.length) return
+    // remembered so a reconnect snapshot does not bring the cleared incidents back
+    const next = [...cleared, ...ids].slice(-MAX_CLEARED)
+    clearedRef.current = new Set(next)
+    setCleared(next)
     setIncidents((prev) => prev.filter((i) => !acked[i.incident_id]))
-  }, [acked])
+  }, [incidents, acked, cleared])
 
   const selected = useMemo(() => incidents.find((i) => i.incident_id === selectedId) || null, [incidents, selectedId])
 
   return {
-    incidents, filtered, stats, acked, isAcked,
+    incidents, filtered, stats, acked, isAcked, lastNew,
     statusFilter, setStatusFilter, classFilter, setClassFilter, severityFilter, setSeverityFilter,
     selected, setSelectedId, acknowledge, acknowledgeAll, clearAcknowledged,
   }

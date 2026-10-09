@@ -8,8 +8,7 @@ const POSTURE = [
   { icon: 'lock', title: 'No return path', text: 'No block, isolate or rate-limit action exists - intelligence only.' },
 ]
 
-function IngestSourcesPanel({ meta, stats, connected, incidentStats, activeClass, onSelectClass }) {
-  const sources = meta?.sources || []
+function IngestSourcesPanel({ sources = [], stats, connected, incidentStats, activeClass, onSelectClass }) {
   return (
     <div className="h-full flex flex-col gap-4 overflow-y-auto pr-1 thin-scrollbar">
       <section>

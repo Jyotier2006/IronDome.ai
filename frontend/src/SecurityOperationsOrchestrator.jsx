@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 
 import BootSequence from './components/SystemInitializationSequence'
@@ -23,8 +23,11 @@ import IncidentForensicsModal from './components/alerts/IncidentForensicsModal'
 import useSensorStream from './hooks/useSensorStream'
 import useIncidentStore from './hooks/useIncidentStore'
 import { downloadJson } from './services/httpApiClient'
+import { SENSOR_URL, USE_MOCK } from './services/realtimeTransportClient'
 import { toast } from '@utils/notificationEventBus'
 import { CLASS_ORDER, classInfo, entityText } from './constants/threatModel'
+
+const OFFLINE_GRACE_MS = 2500   // the first connect takes a moment; only then call the sensor offline
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: 'chart' },
@@ -53,23 +56,32 @@ export default function App() {
 
   const sensor = useSensorStream()
   const store = useIncidentStore()
-  const lastIncident = useRef(null)
+  const [offline, setOffline] = useState(false)
+  const [labCover, setLabCover] = useState(0)   // px of the right edge under the open traffic lab
   const TERMINAL_HEIGHT = termExpanded ? 300 : 150
 
-  // Announce new incidents; pulse the viewport edge for critical ones.
+  // Announce each newly raised incident (snapshots on connect are not announced);
+  // pulse the viewport edge for critical ones.
+  const { lastNew } = store
   useEffect(() => {
-    const top = store.incidents[0]
-    if (!top || top.incident_id === lastIncident.current) return
-    const first = lastIncident.current === null
-    lastIncident.current = top.incident_id
-    if (first) return
-    const info = classInfo(top.threat_class)
-    toast(`(${info.ps}) ${top.technique_label} - ${entityText(top)}`, top.severity === 'critical' ? 'warning' : 'info', 3600)
-    if (top.severity === 'critical') {
+    if (!lastNew) return
+    const info = classInfo(lastNew.threat_class)
+    toast(`(${info.ps}) ${lastNew.technique_label || lastNew.technique} - ${entityText(lastNew)}`,
+          lastNew.severity === 'critical' ? 'warning' : 'info', 3600)
+    if (lastNew.severity === 'critical') {
       setFlash(false)
       requestAnimationFrame(() => setFlash(true))
     }
-  }, [store.incidents])
+  }, [lastNew])
+
+  useEffect(() => {
+    if (sensor.connected || USE_MOCK) {
+      setOffline(false)
+      return undefined
+    }
+    const t = setTimeout(() => setOffline(true), OFFLINE_GRACE_MS)
+    return () => clearTimeout(t)
+  }, [sensor.connected])
 
   useEffect(() => {
     const onHash = () => setTabState(tabFromHash())
@@ -108,7 +120,7 @@ export default function App() {
   ]
 
   return (
-    <div className="h-screen grid grid-rows-[auto_1fr] overflow-hidden relative">
+    <div className="h-screen grid grid-cols-1 grid-rows-[auto_1fr] overflow-hidden relative">
       <div className="ambient-bg" />
       {booting && <BootSequence onDone={() => setBooting(false)} />}
       {flash && <div className="fixed inset-0 z-40 pointer-events-none critical-flash" onAnimationEnd={() => setFlash(false)} />}
@@ -117,22 +129,33 @@ export default function App() {
         connected={sensor.connected}
         stats={sensor.stats}
         openIncidents={store.stats.open}
+        autoAttacks={Boolean(sensor.meta?.ingest?.auto_scenarios)}
         paused={sensor.paused}
         onTogglePause={sensor.togglePause}
         onOpenPalette={() => setPaletteOpen(true)}
       />
 
+      {offline && (
+        <div role="status" className="fixed top-16 left-1/2 -translate-x-1/2 z-30 max-w-[92vw] px-3.5 py-2 rounded-lg border border-status-critical/30 bg-[#1a1016]/95 shadow-lg flex items-center gap-2.5 text-[12px] text-text-secondary">
+          <span className="w-2 h-2 rounded-full bg-status-critical shrink-0" />
+          <span>
+            <b className="font-medium text-text-primary">Sensor offline</b> - reconnecting to <span className="font-mono">{SENSOR_URL}</span>.
+            Start it with <span className="font-mono text-text-primary">START.bat</span> (or <span className="font-mono">npm run dev</span>).
+          </span>
+        </div>
+      )}
+
       <main className="flex overflow-hidden min-h-0" style={{ paddingBottom: TERMINAL_HEIGHT }}>
         <aside className="w-72 xl:w-80 border-r border-white/5 p-4 overflow-hidden flex-shrink-0 hidden lg:block">
           <IngestSourcesPanel
-            meta={sensor.meta} stats={sensor.stats} connected={sensor.connected}
+            sources={sensor.sources} stats={sensor.stats} connected={sensor.connected}
             incidentStats={store.stats} activeClass={store.classFilter} onSelectClass={selectClass}
           />
         </aside>
 
         <section className="flex-1 p-4 overflow-hidden min-w-0">
           <div className="h-full glass-panel p-4 flex flex-col">
-            <nav className="flex items-center gap-1 mb-4 pb-3 border-b border-white/5 overflow-x-auto" aria-label="Views">
+            <nav className="flex items-center gap-1 mb-4 pb-3 border-b border-white/5 overflow-x-auto thin-scrollbar" aria-label="Views">
               {TABS.map((t) => {
                 const active = tab === t.id
                 return (
@@ -156,9 +179,10 @@ export default function App() {
                 )}
                 {tab === 'flows' && <FlowExplorerPanel flows={sensor.flows} paused={sensor.paused} onTogglePause={sensor.togglePause} />}
                 {tab === 'timeline' && <TimelinePanel incidents={store.incidents} runs={sensor.runs} onOpenIncident={store.setSelectedId} />}
-                {tab === 'models' && <ModelRegistryPanel />}
+                {tab === 'models' && <ModelRegistryPanel connected={sensor.connected} />}
                 {tab === 'compliance' && (
-                  <CompliancePanel meta={sensor.meta} stats={sensor.stats} peak={sensor.peak} incidentStats={store.stats} incidents={store.incidents} />
+                  <CompliancePanel meta={sensor.meta} sources={sensor.sources} stats={sensor.stats} peak={sensor.peak}
+                                   incidentStats={store.stats} incidents={store.incidents} />
                 )}
               </ErrorBoundary>
             </div>
@@ -178,7 +202,8 @@ export default function App() {
         </ErrorBoundary>
       </div>
 
-      <TrafficLabController scenarios={sensor.meta?.scenarios} runs={sensor.runs} available={sensor.meta?.ingest?.lab !== false} />
+      <TrafficLabController scenarios={sensor.meta?.scenarios} runs={sensor.runs} connected={sensor.connected}
+                            available={sensor.meta?.ingest?.lab !== false} onCoverChange={setLabCover} />
       <IncidentForensicsModal
         incident={store.selected}
         isOpen={!!store.selected}
@@ -186,7 +211,7 @@ export default function App() {
         onClose={() => store.setSelectedId(null)}
         onAcknowledge={store.acknowledge}
       />
-      <ToastHost />
+      <ToastHost offsetRight={labCover} />
       <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} actions={paletteActions} />
     </div>
   )

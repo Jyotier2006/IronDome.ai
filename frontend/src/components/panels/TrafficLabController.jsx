@@ -10,7 +10,9 @@ import { CLASS_ORDER, classInfo } from '@/constants/threatModel'
  * Injecting a scenario changes what the simulated network does; the sensor still
  * only observes the resulting one-way flow stream and must detect it on its own.
  */
-function TrafficLabController({ scenarios, runs, available }) {
+const LAB_WIDTH = 360
+
+function TrafficLabController({ scenarios, runs, connected, available, onCoverChange }) {
   const [open, setOpen] = useState(false)
   const [intensity, setIntensity] = useState(1)
   const [busy, setBusy] = useState(null)
@@ -21,6 +23,9 @@ function TrafficLabController({ scenarios, runs, available }) {
     window.addEventListener('irondome:open-lab', onOpen)
     return () => window.removeEventListener('irondome:open-lab', onOpen)
   }, [])
+
+  // tell the page how much of the right edge the panel covers (toasts move clear of it)
+  useEffect(() => { onCoverChange?.(open ? LAB_WIDTH : 0) }, [open, onCoverChange])
 
   useEffect(() => {
     if (!open) return undefined
@@ -39,6 +44,7 @@ function TrafficLabController({ scenarios, runs, available }) {
 
   const now = Date.now() / 1000
   const active = (runs || []).filter((r) => r.end_wall && r.end_wall > now)
+  const canInject = connected && available
 
   const inject = async (s) => {
     setBusy(s.id)
@@ -55,7 +61,8 @@ function TrafficLabController({ scenarios, runs, available }) {
   return (
     <>
       <button type="button" onClick={() => setOpen((o) => !o)}
-              className={`fixed top-1/2 -translate-y-1/2 z-50 transition-all duration-300 ${open ? 'right-[360px]' : 'right-0'}`}
+              className="fixed top-1/2 -translate-y-1/2 z-50 transition-all duration-300"
+              style={{ right: open ? LAB_WIDTH : 0 }}
               aria-label="Traffic lab">
         <span className={`flex items-center gap-1 px-2 py-4 rounded-l-lg border border-r-0 border-white/10 ${open ? 'bg-white/[0.12] text-text-primary' : 'bg-[#141a29] text-text-secondary hover:text-text-primary'}`}>
           <Icon name="beaker" className="w-5 h-5" />
@@ -66,7 +73,8 @@ function TrafficLabController({ scenarios, runs, available }) {
         {open && (
           <motion.aside initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-                        className="fixed top-0 right-0 h-full w-[360px] z-40 bg-[#0d111c] border-l border-white/10 shadow-2xl flex flex-col">
+                        className="fixed top-0 right-0 h-full z-40 bg-[#0d111c] border-l border-white/10 shadow-2xl flex flex-col"
+                        style={{ width: LAB_WIDTH }}>
             <div className="p-4 border-b border-white/[0.07]">
               <div className="flex items-center justify-between">
                 <h3 className="text-[15px] font-semibold text-text-primary flex items-center gap-2"><Icon name="beaker" /> Traffic lab</h3>
@@ -97,9 +105,13 @@ function TrafficLabController({ scenarios, runs, available }) {
             )}
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 thin-scrollbar">
-              {!available && (
+              {!connected && (
+                <p className="text-[12px] text-text-secondary">The sensor is offline. Start it with START.bat; scenarios can be injected once the dashboard reconnects.</p>
+              )}
+              {connected && !available && (
                 <p className="text-[12px] text-text-secondary">The sensor's built-in traffic lab is off (IRONDOME_LAB=off). Replay captures into UDP/2055 with scripts/replay_capture.py instead.</p>
               )}
+              {connected && available && !grouped.length && <p className="text-[12px] text-text-muted">Loading scenarios…</p>}
               {grouped.map(([cls, list]) => (
                 <div key={cls}>
                   <p className="text-[11px] text-text-muted mb-1.5 flex items-center gap-1.5">
@@ -108,7 +120,7 @@ function TrafficLabController({ scenarios, runs, available }) {
                   </p>
                   <div className="space-y-1.5">
                     {list.map((s) => (
-                      <button key={s.id} type="button" disabled={!available || busy === s.id} onClick={() => inject(s)}
+                      <button key={s.id} type="button" disabled={!canInject || busy === s.id} onClick={() => inject(s)}
                               className="w-full text-left p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.07] transition-colors disabled:opacity-50">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[12px] font-medium text-text-primary">{s.title}</span>

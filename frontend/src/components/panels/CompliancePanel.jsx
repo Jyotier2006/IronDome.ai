@@ -1,7 +1,16 @@
 import { memo } from 'react'
 import { Icon, PanelTitle } from '@components/common/ui'
 import { downloadJson, fetchAlertSchema } from '@services/httpApiClient'
+import { toast } from '@utils/notificationEventBus'
 import { CONSTRAINTS, fmtCompact, fmtInt, fmtPct } from '@/constants/threatModel'
+
+async function downloadSchema() {
+  try {
+    downloadJson('irondome-alert-schema-1.0.json', await fetchAlertSchema())
+  } catch (e) {
+    toast(`Could not fetch the alert schema from the sensor: ${e.message}`, 'warning', 3600)
+  }
+}
 
 const SCHEMA_FIELDS = ['timestamp', 'flow_id', 'threat_class', 'confidence', 'evidence', 'severity', 'technique', 'mitre_attack', 'flow', 'entity', 'detector']
 
@@ -19,8 +28,8 @@ function Stage({ icon, title, lines, last = false }) {
   )
 }
 
-function CompliancePanel({ meta, stats, peak, incidentStats, incidents }) {
-  const udp = meta?.sources?.find((s) => s.id === 'udp')
+function CompliancePanel({ meta, sources = [], stats, peak, incidentStats, incidents }) {
+  const udp = sources.find((s) => s.id === 'udp')
   const modes = Object.values(meta?.detector_modes || {})
   const mlCount = modes.filter((m) => m === 'ml').length
   const lat = stats?.latency || {}
@@ -102,7 +111,7 @@ function CompliancePanel({ meta, stats, peak, incidentStats, incidents }) {
                 {c.id === 'e' && (
                   <div className="mt-2 flex gap-2">
                     <button type="button" className="btn-ghost !px-2.5 !py-1 !text-[12px] flex items-center gap-1.5 border border-white/10"
-                            onClick={async () => downloadJson('irondome-alert-schema-1.0.json', await fetchAlertSchema())}>
+                            onClick={downloadSchema}>
                       <Icon name="download" className="w-3.5 h-3.5" /> Alert JSON Schema
                     </button>
                     <button type="button" disabled={!incidents?.length}

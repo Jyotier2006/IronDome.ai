@@ -516,7 +516,7 @@ class _SrcScan:
     __slots__ = ("events", "dirty", "last_eval", "wall")
 
     def __init__(self):
-        self.events = deque(maxlen=5000)   # (te, dst, dport, failed, no_payload, pkts, proto)
+        self.events = deque(maxlen=5000)   # (te, dst, dport, failed, no_payload, pkts, proto, sport)
         self.dirty = False
         self.last_eval = -math.inf
         self.wall = 0.0
@@ -539,7 +539,7 @@ class ScanExtractor:
         failed = pb == 0 or "R" in r["flags_bwd"] or ("R" in r["flags_fwd"] and r["bytes_fwd"] <= 66 * pf)
         no_payload = r["bytes_fwd"] <= 66 * pf and r["bytes_bwd"] <= 66 * max(pb, 1)
         st = self.state.get_or_create(r["src_ip"], _SrcScan)
-        st.events.append((r["te"], r["dst_ip"], r["dst_port"], failed, no_payload, pf + pb, r["proto"]))
+        st.events.append((r["te"], r["dst_ip"], r["dst_port"], failed, no_payload, pf + pb, r["proto"], r["src_port"]))
         st.dirty = True
         if wall > st.wall:
             st.wall = wall
@@ -573,7 +573,7 @@ class ScanExtractor:
         per_host: dict = {}
         per_port: dict = {}
         failed = no_payload = pkts = tcp = 0
-        for te, dst, dport, f, npay, p, proto in events:
+        for te, dst, dport, f, npay, p, proto, _sport in events:
             hosts[dst] = hosts.get(dst, 0) + 1
             ports[dport] = ports.get(dport, 0) + 1
             s = per_host.get(dst)
@@ -623,8 +623,9 @@ class ScanExtractor:
             top_hosts[e[1]] = top_hosts.get(e[1], 0) + 1
         ports = sorted({e[2] for e in events})
         last = events[-1]
-        rep = (src, 0, last[1], last[2], last[6])
-        samples = [(src, 0, e[1], e[2], e[6]) for e in events[-6:]]
+        # real probe tuples, so the flow ids join with Zeek / Suricata records of the same probes
+        rep = (src, last[7], last[1], last[2], last[6])
+        samples = [(src, e[7], e[1], e[2], e[6]) for e in events[-6:]]
         context = {
             "window": {"start": events[0][0], "end": last[0], "seconds": self.SPAN},
             "top_targets": [{"ip": ip, "flows": c} for ip, c in sorted(top_hosts.items(), key=lambda kv: -kv[1])[:5]],

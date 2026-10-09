@@ -153,6 +153,36 @@ class TestSchemaAndScoring(unittest.TestCase):
         self.assertEqual((r["proto"], r["src_port"], r["dst_port"], r["flags_fwd"]), (17, 53, 65535, "SA"))
         self.assertEqual(r["dns"]["qname"], "example.com")
 
+    def test_normalize_flow_bounds_hostile_values(self):
+        now = 1_758_000_000.0
+        r = normalize_flow({"src_ip": "10.0.0.1", "dst_ip": "1.2.3.4", "ts": -1e30, "te": 1e30, "proto": 10 ** 20,
+                            "bytes_fwd": int("9" * 400), "pkts_fwd": "9" * 400, "bytes_bwd": float("inf"),
+                            "tls": {"sni": 12345, "ja3": ["x"], "alpn": ["h2", "http/1.1"], "ciphers": "abc",
+                                    "exts": [1, 2, 3], "version": None},
+                            "splt": {"len": [10 ** 30, -(10 ** 30), "x"], "iat": [1e300, -5]}}, now=now)
+        self.assertEqual((r["ts"], r["te"]), (now, now))     # out-of-range timestamps fall back to arrival time
+        self.assertEqual(r["proto"], 255)
+        self.assertLessEqual(r["bytes_fwd"], 10 ** 15)
+        self.assertLessEqual(r["pkts_fwd"], 10 ** 12)
+        self.assertEqual(r["bytes_bwd"], 0)
+        self.assertEqual(r["tls"], {"alpn": "h2", "ciphers": 0, "exts": 3})   # wrong-typed handshake fields dropped
+        self.assertEqual(r["splt"]["len"], [65535, -65535, 0])
+        self.assertEqual(r["splt"]["iat"][1], 0.0)
+        r = normalize_flow({"src_ip": "10.0.0.1", "dst_ip": "1.2.3.4", "ts": now - 1e6, "te": now})
+        self.assertEqual(r["te"] - r["ts"], 86400.0)          # a flow cannot start more than a day before it ends
+
+    def test_hostile_record_cannot_poison_live_windows(self):
+        # one absurd record used to overflow float maths inside a window, so every later
+        # evaluate() of that window raised and the live sensor's loop stopped for good
+        pipe = FeaturePipeline("t", "live")
+        now = 1_758_000_000.0
+        for i in range(3):
+            pipe.ingest(normalize_flow({"src_ip": "10.10.1.5", "dst_ip": "93.184.216.34", "src_port": 40000 + i,
+                                        "dst_port": 443, "proto": 6, "ts": now - 1, "te": now,
+                                        "bytes_fwd": int("9" * 400), "pkts_fwd": 10 ** 40}, now=now), now)
+        for k in range(1, 12):
+            pipe.evaluate(now_wall=now + k * 10)              # must not raise
+
     def test_evidence_consistency_guard(self):
         tcp_only = {"tcp_ratio": 1.0, "udp_ratio": 0.0, "icmp_ratio": 0.0, "syn_only_ratio": 0.0, "amp_port_ratio": 0.0,
                     "src_entropy_norm": 0.5, "flows_per_src": 3.0, "uniq_src": 30, "slow_ratio": 0.0}

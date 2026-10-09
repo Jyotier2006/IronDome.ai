@@ -198,11 +198,19 @@ def five_tuple(rec: dict) -> dict:
 # ---------------------------------------------------------------------------
 _PROTO_BY_NAME = {"tcp": 6, "udp": 17, "icmp": 1, "icmpv6": 58}
 
+# Bounds for untrusted exporter input. One absurd value (a 400-digit byte count, a
+# timestamp in the year 10^20) would otherwise overflow float maths inside a window and
+# make every later evaluation of that window fail, so values are clamped here, once.
+MAX_TS = 1e10                # year 2286: anything later is a corrupt timestamp
+MAX_FLOW_SECONDS = 86400.0   # longest plausible flow; an older start is clamped to this
+MAX_PKTS = 10 ** 12
+MAX_BYTES = 10 ** 15
+
 
 def _num(v, default=0.0) -> float:
     try:
         f = float(v)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return default
     return f if math.isfinite(f) else default
 
@@ -210,8 +218,16 @@ def _num(v, default=0.0) -> float:
 def _int(v, default=0) -> int:
     try:
         return int(v)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return default
+
+
+def _bounded(v, hi: int, lo: int = 0) -> int:
+    return max(lo, min(hi, _int(v)))
+
+
+def _text(v, limit: int = 255) -> str | None:
+    return v[:limit] if isinstance(v, str) else None
 
 
 def _flags(v) -> str:
@@ -230,47 +246,67 @@ def normalize_flow(raw: dict, now: float | None = None) -> dict | None:
     src, dst = raw.get("src_ip"), raw.get("dst_ip")
     if not isinstance(src, str) or not isinstance(dst, str) or not src or not dst:
         return None
+    src, dst = src.strip()[:64], dst.strip()[:64]
+    if not src or not dst:
+        return None
     proto = raw.get("proto", 6)
     if isinstance(proto, str):
         proto = _PROTO_BY_NAME.get(proto.lower(), _int(proto, 0))
     ts = _num(raw.get("ts"), now or 0.0)
+    if not 0.0 <= ts < MAX_TS:
+        ts = now or 0.0
     te = _num(raw.get("te"), ts)
+    if not 0.0 <= te < MAX_TS:
+        te = ts
     if te < ts:
         te = ts
+    ts = max(ts, te - MAX_FLOW_SECONDS)
     rec = {
         "ts": ts,
         "te": te,
         "src_ip": src,
         "dst_ip": dst,
-        "src_port": max(0, min(65535, _int(raw.get("src_port")))),
-        "dst_port": max(0, min(65535, _int(raw.get("dst_port")))),
-        "proto": _int(proto),
-        "pkts_fwd": max(0, _int(raw.get("pkts_fwd"))),
-        "bytes_fwd": max(0, _int(raw.get("bytes_fwd"))),
-        "pkts_bwd": max(0, _int(raw.get("pkts_bwd"))),
-        "bytes_bwd": max(0, _int(raw.get("bytes_bwd"))),
+        "src_port": _bounded(raw.get("src_port"), 65535),
+        "dst_port": _bounded(raw.get("dst_port"), 65535),
+        "proto": _bounded(proto, 255),
+        "pkts_fwd": _bounded(raw.get("pkts_fwd"), MAX_PKTS),
+        "bytes_fwd": _bounded(raw.get("bytes_fwd"), MAX_BYTES),
+        "pkts_bwd": _bounded(raw.get("pkts_bwd"), MAX_PKTS),
+        "bytes_bwd": _bounded(raw.get("bytes_bwd"), MAX_BYTES),
         "flags_fwd": _flags(raw.get("flags_fwd", "")),
         "flags_bwd": _flags(raw.get("flags_bwd", "")),
-        "seg": max(0, _int(raw.get("seg"))),
+        "seg": _bounded(raw.get("seg"), MAX_PKTS),
     }
     dns = raw.get("dns")
-    if isinstance(dns, dict) and isinstance(dns.get("qname"), str) and dns["qname"]:
+    if isinstance(dns, dict) and isinstance(dns.get("qname"), str) and dns["qname"].strip().rstrip("."):
         rec["dns"] = {
             "qname": dns["qname"].strip().rstrip(".").lower()[:255],
             "qtype": str(dns.get("qtype", "A")).upper()[:10],
             "rcode": str(dns.get("rcode", "NOERROR")).upper()[:12],
-            "answers": max(0, _int(dns.get("answers"))),
+            "answers": _bounded(dns.get("answers"), 10_000),
         }
     tls = raw.get("tls")
     if isinstance(tls, dict):
-        rec["tls"] = {k: tls[k] for k in ("version", "sni", "alpn", "ja3", "ja3s", "ja4", "ciphers", "exts") if k in tls}
+        # strings for the handshake fields, counts for ciphers / extensions: the shapes
+        # tls.tls_metadata() produces, whatever an exporter sends
+        clean = {k: s for k in ("version", "sni", "ja3", "ja3s", "ja4") if (s := _text(tls.get(k))) is not None}
+        alpn = tls.get("alpn")
+        if isinstance(alpn, list):      # an offer list: the first protocol, as tls_metadata() reports it
+            alpn = next((x for x in alpn if isinstance(x, str)), None)
+        if (alpn := _text(alpn)) is not None:
+            clean["alpn"] = alpn
+        for k in ("ciphers", "exts"):
+            if k in tls:
+                v = tls[k]
+                clean[k] = _bounded(len(v) if isinstance(v, list) else v, 10_000)
+        rec["tls"] = clean
     quic = raw.get("quic")
     if isinstance(quic, dict):
         rec["quic"] = {"version": str(quic.get("version", ""))[:16]}
     splt = raw.get("splt")
     if isinstance(splt, dict) and isinstance(splt.get("len"), list):
-        lens = [_int(x) for x in splt["len"][:32]]
-        iats = [max(0.0, _num(x)) for x in (splt.get("iat") or [])[:32]]
+        lens = [_bounded(x, 65535, -65535) for x in splt["len"][:32]]
+        iats = [min(MAX_FLOW_SECONDS, max(0.0, _num(x))) for x in (splt.get("iat") or [])[:32]]
         rec["splt"] = {"len": lens, "iat": iats}
     if isinstance(raw.get("sensor"), str):
         rec["sensor"] = raw["sensor"][:64]

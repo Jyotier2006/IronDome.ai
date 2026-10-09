@@ -30,7 +30,7 @@ JSONL capture in any of these formats.
 | `PORT` | 3001 | REST + Socket.IO |
 | `IRONDOME_UDP_PORT` | 2055 | flow collector |
 | `IRONDOME_LAB` | on | built-in simulated traffic source |
-| `IRONDOME_AUTO_SCENARIOS` | on | inject a random attack every ~2 minutes |
+| `IRONDOME_AUTO_SCENARIOS` | off | `on` injects a random attack every ~2 minutes; off, attacks run only when injected from the dashboard |
 | `IRONDOME_SCALE` | 1.0 | lab background volume |
 | `IRONDOME_WARM_START` | 300 | seconds of estate history loaded at start |
 | `IRONDOME_INTERNAL_CIDRS` | RFC 1918 | protected address space |

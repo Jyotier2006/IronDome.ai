@@ -40,8 +40,8 @@ spec:
           env:
             - name: IRONDOME_LAB             # built-in simulated traffic source; "off" = only real exporters
               value: "on"
-            - name: IRONDOME_AUTO_SCENARIOS
-              value: "on"
+            - name: IRONDOME_AUTO_SCENARIOS  # "on" = a random lab attack every ~2 min; off = only injected ones
+              value: "off"
             - name: IRONDOME_LAB_JA3         # lab's simulated JA3 list; set "off" on a real network
               value: "on"
             - name: IRONDOME_WORKERS         # detection worker processes inside the pod

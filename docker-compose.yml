@@ -20,7 +20,7 @@ services:
       - "2055:2055/udp"      # receive-only flow collector
     environment:
       IRONDOME_LAB: ${IRONDOME_LAB:-on}
-      IRONDOME_AUTO_SCENARIOS: ${IRONDOME_AUTO_SCENARIOS:-on}
+      IRONDOME_AUTO_SCENARIOS: ${IRONDOME_AUTO_SCENARIOS:-off}
       IRONDOME_WORKERS: ${IRONDOME_WORKERS:-0}
       IRONDOME_LAB_JA3: ${IRONDOME_LAB_JA3:-on}
       IRONDOME_SYSLOG: ${IRONDOME_SYSLOG:-}

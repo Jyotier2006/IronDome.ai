@@ -17,7 +17,7 @@
   <img alt="scikit-learn" src="https://img.shields.io/badge/scikit--learn-1.8-F7931E?logo=scikitlearn&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black">
   <img alt="Docker" src="https://img.shields.io/badge/Docker%20%26%20Kubernetes-verified-2496ED?logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-34%20passing-2EA44F">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-38%20passing-2EA44F">
   <img alt="Return path" src="https://img.shields.io/badge/return%20path-none-2EA44F">
 </p>
 
@@ -368,7 +368,8 @@ docker compose up --build          # dashboard http://localhost:8080 · API :300
 git clone https://github.com/Jyotier2006/IronDome.ai.git
 cd IronDome.ai
 setup.bat     :: one time: venv, Python + Node dependencies, unit tests
-START.bat     :: sensor + dashboard -> http://localhost:5173
+START.bat     :: sensor + dashboard -> http://localhost:5173 (restarts a copy that is already running)
+STOP.bat      :: stops the sensor and dashboard
 ```
 
 ```bash
@@ -379,8 +380,10 @@ pip install -r backend/sensor-service/requirements.txt -r model_microservice/req
 npm install && npm run dev          # sensor (API :3001, UDP :2055) + dashboard (:5173)
 ```
 
-The sensor warm-starts with 5 minutes of estate history, streams the built-in traffic lab and injects a random attack every
-~2 minutes. **Just the UI?** `npm run demo` runs the dashboard on built-in sample data.
+The sensor warm-starts with 5 minutes of estate history and streams the built-in traffic lab's benign background traffic.
+Attacks run only when you inject one from the dashboard's **Traffic lab** (the flask tab on the right edge); set
+`IRONDOME_AUTO_SCENARIOS=on` for a random attack every ~2 minutes instead. `STOP.bat` stops the sensor and dashboard.
+**Just the UI?** `npm run demo` runs the dashboard on built-in sample data.
 
 <details>
 <summary><b>Sensor configuration</b> (environment variables)</summary>
@@ -388,7 +391,7 @@ The sensor warm-starts with 5 minutes of estate history, streams the built-in tr
 | Variable | Default | Meaning |
 |---|---|---|
 | `PORT` · `IRONDOME_UDP_PORT` | `3001` · `2055` | API / Socket.IO and the receive-only flow collector |
-| `IRONDOME_LAB` · `IRONDOME_AUTO_SCENARIOS` · `IRONDOME_SCALE` | `on` · `on` · `1.0` | built-in traffic lab, automatic attacks, background volume |
+| `IRONDOME_LAB` · `IRONDOME_AUTO_SCENARIOS` · `IRONDOME_SCALE` | `on` · `off` · `1.0` | built-in traffic lab, automatic random attacks, background volume |
 | `IRONDOME_WARM_START` | `300` | seconds of estate history loaded at start-up |
 | `IRONDOME_INTERNAL_CIDRS` | RFC 1918 | the protected address space |
 | `IRONDOME_WORKERS` | `0` | detection worker processes (scale-out) |
@@ -465,7 +468,7 @@ Socket.IO events: `hello`, `incidents_snapshot`, `flows_snapshot`, `alert`, `ale
 python scripts/fetch_domain_lists.py   # real Tranco / OpenDNS benign domain lists (once)
 npm run train                          # train + validate all 7 models (~1.5 min) -> model_microservice/models/, docs/MODEL_REPORT.md
 npm run evaluate                       # end-to-end replay evaluation (~6 min) -> docs/EVAL_REPORT.md
-npm test                               # 34 unit tests
+npm test                               # 38 unit tests
 python model_microservice/evaluate_domains.py --benign data/opendns_top.txt --dga <your DGA list>
 python model_microservice/recalibrate.py --capture site_baseline.pcapng --dry-run
 IRONDOME_LAB=off python backend/sensor-service/sensor_service.py &  python scripts/benchmark_throughput.py
@@ -545,7 +548,7 @@ each worker scores exactly as a single process would. Details: [`ARCHITECTURE.md
 
 ## 🧪 Testing
 
-`npm test` runs **34 unit tests**. They cover:
+`npm test` runs **38 unit tests**. They cover:
 
 - JA3/JA4 against published reference values, and the Community ID specification vector
 - DNS, NetFlow v5, PCAP, IPFIX, NetFlow v9 and sFlow round trips, including decoder fuzzing
@@ -555,6 +558,7 @@ each worker scores exactly as a single process would. Details: [`ARCHITECTURE.md
 - alert-schema conformance and correlation
 - CEF/syslog delivery, and archive tamper detection
 - a real two-worker scale-out run
+- hostile input: malformed records and datagrams are bounded or counted and can never stop the pipeline
 - the read-only guarantees (live UDP no-reply check, every format through the collector, API-surface check)
 
 ## 🧰 Tech stack
@@ -583,7 +587,7 @@ IronDome.ai/
 ├── scripts/                    # traffic_lab · replay_capture · benchmark_throughput · fetch_domain_lists
 │                               # update_threat_intel · verify_archive
 ├── captures/                   # demo flow captures with ground truth
-├── tests/                      # 34 unit tests
+├── tests/                      # 38 unit tests
 ├── docs/                       # MODEL_REPORT · EVAL_REPORT · THROUGHPUT (generated) · images
 ├── k8s/                        # Kubernetes manifests, guide and scripts
 ├── docker-compose.yml
@@ -603,7 +607,7 @@ IronDome.ai/
 - [x] SOC dashboard for live and replayed detections
 - [x] Training, validation and end-to-end evaluation reports
 - [x] Throughput benchmark with a stated, demonstrated target
-- [x] 34 unit tests, including the read-only guarantees
+- [x] 38 unit tests, including the read-only guarantees
 - [x] Docker images, Docker Compose and Kubernetes manifests, verified by building, running and deploying them
 
 ## 💬 For the Q&A

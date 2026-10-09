@@ -84,7 +84,7 @@ function evidenceFor(tc, tech, ctx) {
             context: { nx_ratio: 0.93 } }
         : { features: { queries: 612, unique_ratio: 1, mean_sub_len: 71, txt_null_ratio: 0.94 },
             top_deviations: [dev('mean_sub_len', 71, 9.8, 11.3), dev('unique_ratio', 1, 0.31, 3.9), dev('txt_null_ratio', 0.94, 0.03, 8.2)],
-            context: { base_domain: ctx.target, sample_queries: [`${hex(60)}.t.${ctx.target}`], qtypes: { TXT: 402, CNAME: 110, MX: 100 } } }
+            context: { base_domain: ctx.domain, sample_queries: [`${hex(60)}.${ctx.domain}`], qtypes: { TXT: 402, CNAME: 110, MX: 100 } } }
     case 'encrypted_malware':
       return {
         features: { ja3_prevalence: 1, dst_prevalence: 1, sni_present: 0, alpn_present: 0, bytes_bwd: 1420 },
@@ -111,11 +111,12 @@ export function mockIncident(scenarioId, ctx = {}) {
   const info = THREAT_CLASSES[tc]
   const conf = +rnd(0.86, 0.999).toFixed(4)
   const now = Date.now()
-  const c = { attacker: ctx.attacker || ip(), host: ctx.host || host(), target: ctx.target || `${hex(8)}.xyz` }
+  // the tunnel's base domain is its own name, never the run's target address
+  const c = { attacker: ctx.attacker || ip(), host: ctx.host || host(), domain: `t.${hex(10).replace(/[0-9]/g, 'k')}.xyz` }
   const entity = {
     volumetric_ddos: { type: 'destination', ip: '10.10.2.80' },
     c2_beaconing: { type: 'host_pair', src_ip: c.host, dst_ip: c.attacker, dst_port: 443 },
-    dga_dns_tunnelling: tech === 'dga' ? { type: 'host', ip: c.host } : { type: 'host_domain', ip: c.host, domain: c.target },
+    dga_dns_tunnelling: tech === 'dga' ? { type: 'host', ip: c.host } : { type: 'host_domain', ip: c.host, domain: c.domain },
     encrypted_malware: { type: 'flow', src_ip: c.host, dst_ip: c.attacker, dst_port: 443 },
     recon_scan: { type: 'source', ip: tech === 'vertical_scan' ? c.attacker : c.host },
     data_exfiltration: { type: 'host_pair', src_ip: c.host, dst_ip: c.attacker },
@@ -169,10 +170,12 @@ export function mockFlow() {
   return f
 }
 
+const MOCK_BOOT_ID = hex(12)   // one demo "sensor run" per page load
+
 export function mockHello() {
   return {
-    service: 'irondome-sensor', core_version: '2.0.0', read_only: true, issues_mitigation: false, decrypts_payload: false,
-    ingest: { udp_port: 2055, lab: true }, learning_seconds: 300, throughput_target_fps: 5000,
+    service: 'irondome-sensor', core_version: '2.0.0', boot_id: MOCK_BOOT_ID, read_only: true, issues_mitigation: false, decrypts_payload: false,
+    ingest: { udp_port: 2055, lab: true, auto_scenarios: false }, learning_seconds: 300, throughput_target_fps: 5000,
     threat_classes: CLASS_ORDER.map((id) => ({
       id, ps_ref: THREAT_CLASSES[id].ps, label: THREAT_CLASSES[id].label, summary: THREAT_CLASSES[id].summary, recommended_action: ACTIONS[id],
       techniques: Object.values(SCENARIO_TECH).filter(([tc]) => tc === id).map(([, tk]) => tk)

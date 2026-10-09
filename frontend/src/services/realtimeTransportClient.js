@@ -35,19 +35,18 @@ class MockSensor {
     this.listeners.get(ev)?.forEach((cb) => cb(data))
   }
 
+  // Like the live sensor, the demo starts with no incidents and never attacks on its own:
+  // detections appear only for scenarios injected from the traffic lab.
   connect() {
     if (this.connected) return this
     this.connected = true
     setTimeout(() => {
       this.emitLocal('connect')
       this.emitLocal('hello', mockHello())
-      this.emitLocal('incidents_snapshot', ['port_scan', 'dga'].map((s) => mockIncident(s)))
+      this.emitLocal('incidents_snapshot', [])
       this.emitLocal('flows_snapshot', Array.from({ length: 30 }, mockFlow))
     }, 150)
     this.timers.push(setInterval(() => this.tick(), 1000))
-    this.timers.push(setInterval(() => {
-      if (!this.attack && Math.random() < 0.35) this.inject(MOCK_SCENARIOS[Math.floor(Math.random() * 12)].id, true)
-    }, 20000))
     return this
   }
 
@@ -68,7 +67,8 @@ class MockSensor {
       total_flows: Math.round(this.total), total_bytes: this.bytes, peak_flows_per_s: 0, target_flows_per_s: 5000,
       encrypted_share: 0.76, encrypted_byte_share: 0.9, handshake_share: 0.07, dns_share: 0.12, protocol_mix: { TCP: 0.66, UDP: 0.33, ICMP: 0.01 },
       latency: { p50_ms: 1150, p95_ms: 1680, max_ms: 1900, samples: 40 }, context_age_s: 900, baseline_learning: false,
-      open_incidents: 2, shed: 0, uptime_s: 0,
+      open_incidents: this.attack?.sent ? 1 : 0, shed: 0, uptime_s: 0,
+      sources: mockHello().sources.map((s) => (s.id === 'lab' ? { ...s, records: Math.round(this.total) } : s)),
     })
     this.emitLocal('flows_batch', Array.from({ length: 8 }, mockFlow))
     if (this.attack && Date.now() > this.attack.alertAt && !this.attack.sent) {

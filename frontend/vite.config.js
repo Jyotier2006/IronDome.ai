@@ -28,6 +28,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true,   // fail visibly rather than drift to 5174 while START.bat points at 5173
     host: true,
   },
 })

@@ -20,7 +20,8 @@ Env:   PORT (3001)            REST + Socket.IO for the dashboard
        IRONDOME_UDP_PORT      receive-only flow collector (2055)
        IRONDOME_LAB           on | off   built-in traffic lab (default on)
        IRONDOME_SCALE         background traffic scale for the lab (default 1.0)
-       IRONDOME_AUTO_SCENARIOS on | off  inject a random attack every ~2 min (default on)
+       IRONDOME_AUTO_SCENARIOS on | off  inject a random attack every ~2 min (default off: attacks
+                              run only when injected from the dashboard's traffic lab)
        IRONDOME_WARM_START    seconds of estate history loaded at start (default 300)
        IRONDOME_INTERNAL_CIDRS protected address space (default RFC1918)
        IRONDOME_WORKERS       detection worker processes (default 0 = run in this process)
@@ -41,6 +42,8 @@ import os
 import random
 import sys
 import time
+import traceback
+import uuid
 from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -75,13 +78,14 @@ from irondome.sharding import ShardRouter  # noqa: E402
 PORT = int(os.environ.get("PORT", 3001))
 UDP_PORT = int(os.environ.get("IRONDOME_UDP_PORT", 2055))
 LAB_ENABLED = os.environ.get("IRONDOME_LAB", "on").lower() in ("on", "1", "true", "yes")
-AUTO_SCENARIOS = os.environ.get("IRONDOME_AUTO_SCENARIOS", "on").lower() in ("on", "1", "true", "yes")
+AUTO_SCENARIOS = os.environ.get("IRONDOME_AUTO_SCENARIOS", "off").lower() in ("on", "1", "true", "yes")
 SCALE = float(os.environ.get("IRONDOME_SCALE", "1.0"))
 WARM_START_SECONDS = float(os.environ.get("IRONDOME_WARM_START", "300"))
 WORKERS = max(0, int(os.environ.get("IRONDOME_WORKERS", "0")))
 TICK = 0.5                         # seconds between pipeline evaluations / lab steps
 AUTO_SCENARIO_GAP = (80.0, 140.0)  # seconds between auto-injected demo scenarios
 THROUGHPUT_TARGET_FPS = 5000       # stated sustained-throughput target (docs/THROUGHPUT.md)
+BOOT_ID = uuid.uuid4().hex[:12]    # changes on every restart, so dashboards drop the previous run's state
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +120,7 @@ class Sensor:
         }
         self.detector_modes = {d: self.scorer.models[d].mode for d in self.scorer.models}
         self.latencies: deque = deque(maxlen=500)
+        self.tick_errors = 0               # pipeline ticks that raised (logged; streaming carries on)
         self.reset_counters()
 
     def reset_counters(self):
@@ -242,7 +247,8 @@ class Sensor:
         now = time.time()
         dt = max(1e-3, now - self.window_since)
         fps = self.window_flows / dt
-        self.peak_fps = max(self.peak_fps, fps)
+        if dt >= 0.5:      # a sliver of a window (e.g. right after a counter reset) would inflate the peak
+            self.peak_fps = max(self.peak_fps, fps)
         stats = {
             "ts": now,
             "flows_per_s": round(fps, 1),
@@ -328,7 +334,10 @@ class FlowCollector(asyncio.DatagramProtocol):
     def sweep(self, wall: float):
         """sFlow flows complete on idle / active timeouts, not on arrival: export them."""
         for rec in self.sflow.sweep(wall):
-            self.sensor.ingest(rec, wall, "udp")
+            try:
+                self.sensor.ingest(rec, wall, "udp")
+            except Exception:
+                self.sensor.sources["udp"]["errors"] += 1
 
     def datagram_received(self, data: bytes, addr):
         src = self.sensor.sources["udp"]
@@ -361,12 +370,18 @@ class FlowCollector(asyncio.DatagramProtocol):
                     records = [json.loads(line) for line in text.splitlines() if line.strip()]
                 else:
                     records = [json.loads(text)]
-        except (ValueError, UnicodeDecodeError):
+        except Exception:   # malformed datagram of any kind: count it, never answer, keep listening
+            src["errors"] += 1
+            return
+        if not isinstance(records, list):
             src["errors"] += 1
             return
         for rec in records:
             if isinstance(rec, dict):
-                self.sensor.ingest(rec, wall, "udp")
+                try:
+                    self.sensor.ingest(rec, wall, "udp")
+                except Exception:
+                    src["errors"] += 1
 
     def error_received(self, exc):   # pragma: no cover - logged, never answered
         self.sensor.sources["udp"]["errors"] += 1
@@ -423,9 +438,9 @@ def sources_payload() -> list[dict]:
 
 def hello_payload() -> dict:
     return {
-        "service": "irondome-sensor", "core_version": CORE_VERSION,
+        "service": "irondome-sensor", "core_version": CORE_VERSION, "boot_id": BOOT_ID,
         "read_only": True, "issues_mitigation": False, "decrypts_payload": False,
-        "ingest": {"udp_port": UDP_PORT, "lab": LAB_ENABLED},
+        "ingest": {"udp_port": UDP_PORT, "lab": LAB_ENABLED, "auto_scenarios": LAB_ENABLED and AUTO_SCENARIOS},
         "learning_seconds": LEARNING_SECONDS,
         "throughput_target_fps": THROUGHPUT_TARGET_FPS,
         "threat_classes": threat_catalog(),
@@ -453,10 +468,11 @@ async def disconnect(sid):
 async def _emit(new_inc, upd_inc):
     for inc in new_inc:
         await sio.emit("alert", inc)
-    for inc in upd_inc:
-        await sio.emit("alert_update", {"incident_id": inc["incident_id"], "occurrences": inc["occurrences"],
-                                        "last_seen": inc.get("last_seen"), "confidence": inc["confidence"],
-                                        "severity": inc["severity"], "related_flow_ids": inc.get("related_flow_ids", [])[:16]})
+    # an update carries the whole incident: a stronger sighting can change the technique,
+    # description and evidence as well as the counters
+    latest = {inc["incident_id"]: inc for inc in upd_inc}
+    for inc in latest.values():
+        await sio.emit("alert_update", inc)
 
 
 def _run_public(run: dict) -> dict:
@@ -497,35 +513,48 @@ def _warm_start():
 
 
 async def pump():
-    """Main loop: step the lab (if enabled), evaluate the pipeline, stream results."""
+    """Main loop: step the lab (if enabled), evaluate the pipeline, stream results.
+
+    A fault in one tick (a malformed record, an output that throws) is logged and the next
+    tick runs as normal - the sensor must never silently stop streaming."""
     rng = random.Random()
-    last_stats = 0.0
+    last_stats = time.time()        # first stats after one full window, not on the first tick
+    last_error_log = 0.0
     next_auto = time.time() + 20.0
     while True:
         wall = time.time()
-        if lab is not None:
-            t = lab_clock["t"]
-            for rec in lab.step(t, t + TICK):
-                # map lab event time onto the wall clock so the live watermark applies
-                rec["ts"] = wall - (t + TICK - rec["ts"])
-                rec["te"] = wall - (t + TICK - rec["te"])
-                sensor.ingest(rec, wall, "lab")
-            lab_clock["t"] = t + TICK
-            if AUTO_SCENARIOS and wall >= next_auto and not lab.active:
-                pub = _start_run(rng.choice([s for s in LAB_SCENARIOS if s != "kill_chain"]),
-                                 intensity=rng.uniform(0.9, 1.3))
-                await sio.emit("scenario", {"event": "start", "auto": True, **pub})
-                next_auto = wall + rng.uniform(*AUTO_SCENARIO_GAP)
-        new_inc, upd_inc = sensor.evaluate(wall)
-        if new_inc or upd_inc:
-            await _emit(new_inc, upd_inc)
-        if wall - last_stats >= 1.0:
-            await sio.emit("flow_stats", sensor.flow_stats())
-            await sio.emit("flows_batch", list(sensor.recent_flows)[:25])
-            sensor.correlator.expire(wall)
-            if collector is not None:
-                collector.sweep(wall)
-            last_stats = wall
+        try:
+            if lab is not None:
+                t = lab_clock["t"]
+                for rec in lab.step(t, t + TICK):
+                    # map lab event time onto the wall clock so the live watermark applies
+                    rec["ts"] = wall - (t + TICK - rec["ts"])
+                    rec["te"] = wall - (t + TICK - rec["te"])
+                    sensor.ingest(rec, wall, "lab")
+                lab_clock["t"] = t + TICK
+                if AUTO_SCENARIOS and wall >= next_auto and not lab.active:
+                    pub = _start_run(rng.choice([s for s in LAB_SCENARIOS if s != "kill_chain"]),
+                                     intensity=rng.uniform(0.9, 1.3))
+                    await sio.emit("scenario", {"event": "start", "auto": True, **pub})
+                    next_auto = wall + rng.uniform(*AUTO_SCENARIO_GAP)
+            new_inc, upd_inc = sensor.evaluate(wall)
+            if new_inc or upd_inc:
+                await _emit(new_inc, upd_inc)
+            if wall - last_stats >= 1.0:
+                last_stats = wall
+                stats = sensor.flow_stats()
+                stats["sources"] = sources_payload()
+                await sio.emit("flow_stats", stats)
+                await sio.emit("flows_batch", list(sensor.recent_flows)[:25])
+                sensor.correlator.expire(wall)
+                if collector is not None:
+                    collector.sweep(wall)
+        except Exception:
+            sensor.tick_errors += 1
+            if wall - last_error_log >= 10.0:      # rate-limit the log, never the recovery
+                last_error_log = wall
+                print(f"pipeline tick failed ({sensor.tick_errors} so far); continuing:", flush=True)
+                traceback.print_exc()
         await asyncio.sleep(max(0.0, TICK - (time.time() - wall)))
 
 
@@ -537,7 +566,13 @@ async def lifespan(app: FastAPI):
     import socket as _socket
     usock = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
     usock.setsockopt(_socket.SOL_SOCKET, _socket.SO_RCVBUF, 16 * 1024 * 1024)   # absorb export bursts
-    usock.bind(("0.0.0.0", UDP_PORT))
+    try:
+        usock.bind(("0.0.0.0", UDP_PORT))
+    except OSError as e:
+        usock.close()
+        raise RuntimeError(f"cannot open the flow collector on UDP/{UDP_PORT} ({e}). Another IronDome sensor is "
+                           f"probably still running: stop it with STOP.bat, or choose another port with "
+                           f"IRONDOME_UDP_PORT.") from None
     collector = FlowCollector(sensor)
     transport, _ = await loop.create_datagram_endpoint(lambda: collector, sock=usock)
     if WORKERS:
@@ -549,7 +584,8 @@ async def lifespan(app: FastAPI):
         print(f"alert outputs disabled: {e}", flush=True)
     for o in sensor.outputs:
         print(f"alert output: {o.describe}", flush=True)
-    print(f"receive-only flow collector on UDP/{UDP_PORT}; dashboard API on :{PORT}; lab={'on' if LAB_ENABLED else 'off'}",
+    print(f"receive-only flow collector on UDP/{UDP_PORT}; dashboard API on :{PORT}; lab={'on' if LAB_ENABLED else 'off'}; "
+          f"automatic attacks={'on' if LAB_ENABLED and AUTO_SCENARIOS else 'off (inject from the dashboard traffic lab)'}",
           flush=True)
     if LAB_ENABLED:
         lab = Lab(seed=None, scale=SCALE)
@@ -581,8 +617,8 @@ class FlowBatch(BaseModel):
 
 class ScenarioRequest(BaseModel):
     scenario: str
-    intensity: float = 1.0
-    duration: float | None = None
+    intensity: float = Field(1.0, allow_inf_nan=False)
+    duration: float | None = Field(None, allow_inf_nan=False, description="seconds; default is the scenario's own")
 
 
 def outputs_status() -> list[dict]:
@@ -592,8 +628,9 @@ def outputs_status() -> list[dict]:
 @app.get("/health")
 async def health():
     return {"status": "healthy", "service": "sensor", "read_only": True, "issues_mitigation": False,
-            "core_version": CORE_VERSION, "detectors": sensor.detector_modes, "clients": len(clients),
-            "udp_port": UDP_PORT, "lab": LAB_ENABLED, "scale": sensor.scale_info(), "outputs": outputs_status()}
+            "core_version": CORE_VERSION, "boot_id": BOOT_ID, "detectors": sensor.detector_modes, "clients": len(clients),
+            "udp_port": UDP_PORT, "lab": LAB_ENABLED, "auto_scenarios": LAB_ENABLED and AUTO_SCENARIOS,
+            "tick_errors": sensor.tick_errors, "scale": sensor.scale_info(), "outputs": outputs_status()}
 
 
 @app.get("/api/overview")
@@ -641,7 +678,7 @@ async def api_alerts(limit: int = 100, threat_class: str | None = None):
     items = list(sensor.incidents)
     if threat_class:
         items = [a for a in items if a["threat_class"] == threat_class]
-    return {"incidents": items[:limit], "count": len(items)}
+    return {"incidents": items[:max(0, min(limit, len(items)))], "count": len(items)}
 
 
 @app.get("/api/alerts/{incident_id}")
@@ -659,7 +696,7 @@ async def api_stats():
 
 @app.get("/api/flows/recent")
 async def api_flows(limit: int = 60):
-    return {"flows": list(sensor.recent_flows)[:limit]}
+    return {"flows": list(sensor.recent_flows)[:max(0, limit)]}
 
 
 @app.post("/api/ingest/flows")
@@ -670,9 +707,12 @@ async def api_ingest(batch: FlowBatch):
     for rec in batch.flows:
         if batch.sensor and "sensor" not in rec:
             rec["sensor"] = batch.sensor
-        if sensor.ingest(rec, wall, "http") is not None:
-            n += 1
-    return {"ingested": n}
+        try:
+            if sensor.ingest(rec, wall, "http") is not None:
+                n += 1
+        except Exception:     # one malformed record never fails the rest of the batch
+            continue
+    return {"ingested": n, "rejected": len(batch.flows) - n}
 
 
 @app.post("/api/scenario")
@@ -684,7 +724,8 @@ async def api_scenario(req: ScenarioRequest):
         raise HTTPException(status_code=409, detail="built-in traffic lab is off (IRONDOME_LAB=off)")
     if req.scenario not in LAB_SCENARIOS:
         raise HTTPException(status_code=400, detail=f"unknown scenario; choose from {list(LAB_SCENARIOS)}")
-    pub = _start_run(req.scenario, intensity=max(0.2, min(3.0, req.intensity)), duration=req.duration)
+    duration = None if req.duration is None else max(5.0, min(600.0, req.duration))
+    pub = _start_run(req.scenario, intensity=max(0.2, min(3.0, req.intensity)), duration=duration)
     await sio.emit("scenario", {"event": "start", "auto": False, **pub})
     return {"started": pub}
 

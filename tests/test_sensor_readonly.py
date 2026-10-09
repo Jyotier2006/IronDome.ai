@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import socket
 import sys
 import time
@@ -98,6 +99,28 @@ class TestReadOnlySensor(unittest.TestCase):
         for f in ("ipfix", "netflow_v9", "sflow"):
             self.assertEqual(fmts[f], before[f] + 1, f)
         self.assertEqual(svc.sensor.sources["udp"]["records"] - n0, 3)
+
+    def test_malformed_datagrams_are_counted_never_raised(self):
+        import random
+        svc = self.svc
+        col = svc.FlowCollector(svc.sensor)
+        rng = random.Random(5)
+        junk = [b"", b"null", b"[1, 2]", b'{"src_ip": 5}', b"\xff\xfe", b'{"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "tls": {"ja3": {}}}']
+        junk += [bytes(rng.randrange(256) for _ in range(rng.randrange(1, 300))) for _ in range(200)]
+        errors = svc.sensor.sources["udp"]["errors"]
+        for d in junk:
+            col.datagram_received(d, ("192.0.2.9", 9999))     # must not raise
+        self.assertGreater(svc.sensor.sources["udp"]["errors"], errors)
+        svc.sensor.evaluate(time.time())                      # and the pipeline still evaluates
+
+    def test_attacks_only_when_injected_by_default(self):
+        # random demo attacks are opt-in (IRONDOME_AUTO_SCENARIOS=on); by default the lab
+        # streams benign traffic and attacks run only when injected from the dashboard
+        if "IRONDOME_AUTO_SCENARIOS" not in os.environ:
+            self.assertFalse(self.svc.AUTO_SCENARIOS)
+        hello = self.svc.hello_payload()
+        self.assertEqual(hello["ingest"]["auto_scenarios"], self.svc.LAB_ENABLED and self.svc.AUTO_SCENARIOS)
+        self.assertTrue(hello["boot_id"])
 
 
 if __name__ == "__main__":

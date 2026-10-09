@@ -6,22 +6,33 @@ import { classInfo, fmtPct } from '@/constants/threatModel'
 
 const ORDER = ['ddos', 'c2_beacon', 'dga_domain', 'dns_tunnel', 'encrypted_malware', 'recon_scan', 'exfiltration']
 
-function ModelRegistryPanel() {
+function ModelRegistryPanel({ connected }) {
   const [cards, setCards] = useState(null)
   const [evaluation, setEvaluation] = useState(null)
   const [error, setError] = useState(null)
   const [open, setOpen] = useState(null)
+  const [attempt, setAttempt] = useState(0)
 
+  // (Re)load until the cards arrive: on mount, on Retry, and when the sensor (re)connects.
   useEffect(() => {
+    if (cards) return undefined
     let alive = true
+    setError(null)
     Promise.all([fetchModels(), fetchEvaluation().catch(() => ({}))])
       .then(([m, e]) => { if (alive) { setCards(m); setEvaluation(e) } })
-      .catch((err) => alive && setError(err.message))
+      .catch((err) => { if (alive) setError(err.message) })
     return () => { alive = false }
-  }, [])
+  }, [attempt, connected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error) {
-    return <p className="text-[12px] text-text-secondary">Could not load model cards from the sensor: {error}</p>
+    return (
+      <div className="text-[12px] text-text-secondary space-y-2">
+        <p>Could not load model cards from the sensor: {error}</p>
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="btn-ghost !px-2.5 !py-1 !text-[12px] border border-white/10">
+          Retry
+        </button>
+      </div>
+    )
   }
   if (!cards) return <p className="text-[12px] text-text-muted">Loading model cards…</p>
 
@@ -76,7 +87,7 @@ function ModelRegistryPanel() {
                     <td className="py-2 px-2 text-right tabular text-text-secondary">{fmtPct(te.false_positive_rate, 2)}</td>
                     <td className="py-2 px-2 text-right tabular text-text-secondary">{fmtPct(st.recall, 1)}</td>
                     <td className="py-2 px-2 text-right tabular text-text-secondary">{c.threshold}</td>
-                    <td className="py-2 pl-2 text-right tabular text-text-secondary">{c.inference_us_per_row} µs/row</td>
+                    <td className="py-2 pl-2 text-right tabular text-text-secondary whitespace-nowrap">{c.inference_us_per_row} µs/row</td>
                   </tr>
                 )
               })}
